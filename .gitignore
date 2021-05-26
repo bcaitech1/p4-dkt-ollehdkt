@@ -5,9 +5,9 @@ wandb
 
 #add when u clone this file
 conf.yml
-README.md
+# README.md
 .gitignore
-
+NanumGothic.ttf
 #etc
 /.ipynb_checkpoints
 dkt/.ipynb_checkpoints

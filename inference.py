@@ -20,7 +20,8 @@ def main(args):
     
 
 if __name__ == "__main__":
-    cf = yaml.load(open('/opt/ml/code/conf.yml'))
+    with open('/opt/ml/code/conf.yml') as f:
+        cf = yaml.load(f, Loader=yaml.FullLoader)
     args = AttrDict(cf)
     # args = parse_args(mode='train')
     os.makedirs(args.model_dir, exist_ok=True)

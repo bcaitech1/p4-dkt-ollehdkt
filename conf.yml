@@ -1,4 +1,4 @@
-model : bert    # {lstm, lstmattn, bert, lgbm}
+model : lgbm    # {lstm, lstmattn, bert, lgbm}
 
 wandb :
     using: True
@@ -8,7 +8,7 @@ wandb :
         - baseline
 
 ##main params
-task_name: bert_4layer50ep_seq50
+task_name: lgbm_test
 seed: 42
 device: cuda
 
@@ -18,11 +18,11 @@ file_name: train_data.csv
 model_dir: models/
 output_dir: output/
 test_file_name: test_data.csv
-max_seq_len: 50
+max_seq_len: 20
 num_workers: 1
 
 ##모델
-hidden_dim : 64
+hidden_dim : 128
 n_layers : 4
 n_heads : 2
 drop_out: 0.2
@@ -50,8 +50,11 @@ lgbm:
                     'bagging_fraction': 0.8, # 원래 0.8 데이터 샘플링 비율
                     'bagging_freq': 1,
                     'n_estimators': 10000, # 트리 개수
-                    'early_stopping_rounds': 100,
                     'seed': 42,
                     'verbose': -1,
                     'n_jobs': -1,
                     }
+
+    verbose_eval : 100 #ori 100
+    num_boost_round : 500
+    early_stopping_rounds : 100
