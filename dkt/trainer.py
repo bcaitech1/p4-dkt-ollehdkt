@@ -13,6 +13,8 @@ import json
 import lightgbm as lgb
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
+from lgbm_utils import *
+
 import wandb
 
 def run(args, train_data, valid_data):
@@ -22,54 +24,18 @@ def run(args, train_data, valid_data):
     train_loader, valid_loader = get_loaders(args, train_data, valid_data)
     
     if args.model=='lgbm':
-        # 사용할 Feature 설정
-        delete_feats=['userID','assessmentItemID','testId','answerCode','Timestamp']
-        
-        FEATS = list(set(train_data.columns)-set(delete_feats))
-        print(f'{len(FEATS)}개의 피처를 사용합니다')
-        print(FEATS)
-        # FEATS = ['KnowledgeTag', 'user_correct_answer', 'user_total_answer', 
-        #          'user_acc', 'test_mean', 'test_sum', 'tag_mean','tag_sum']
-    
-        # X, y 값 분리
-        y_train = train_data['answerCode']
-        train_data = train_data.drop(['answerCode'], axis=1)
-
-        y_test = valid_data['answerCode']
-        valid_data = valid_data.drop(['answerCode'], axis=1)
-
-        lgb_train = lgb.Dataset(train_data[FEATS], y_train)
-        lgb_test = lgb.Dataset(valid_data[FEATS], y_test)
-        model = lgb.train(
-#                     {'objective': 'binary'}, 
-                    lgbm_params,
-                    lgb_train,
-                    valid_sets=[lgb_train, lgb_test],
-                    verbose_eval=100, #ori 100
-                    num_boost_round=500,
-                    early_stopping_rounds=100
-                )
-
-        preds = model.predict(valid_data[FEATS])
-        acc = accuracy_score(y_test, np.where(preds >= 0.5, 1, 0))
-        auc = roc_auc_score(y_test, preds)
-
-        print(f'VALID AUC : {auc} ACC : {acc}\n')
+        #학습
+        model,auc,acc=lgbm_train(args,train_data,valid_data)
         wandb.log({"valid_auc":auc, "valid_acc":acc})
-        _ = lgb.plot_importance(model)
-        
-        # 테스트 예측 결과 저장
-        new_output_path=f'{args.output_dir}{args.task_name}'
-        write_path = os.path.join(new_output_path, "output.csv")
-        if not os.path.exists(new_output_path):
-            os.makedirs(new_output_path)    
-        with open(write_path, 'w', encoding='utf8') as w:
-            print("writing prediction : {}".format(write_path))
-            w.write("id,prediction\n")
-            for id, p in enumerate(preds):
-                w.write('{},{}\n'.format(id,p))
-        
-        print(f"lgbm의 예측파일이 {new_output_path}/{args.task_name}.csv 로 저장됐습니다.")
+        #추론준비
+        csv_file_path = os.path.join(args.data_dir, args.test_file_name)
+        test_df = pd.read_csv(csv_file_path)#, nrows=100000)
+        test_df = make_lgbm_feature(test_df)
+        #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
+        test_df.sort_values(by=['userID','Timestamp'], inplace=True)
+        test_df=lgbm_make_test_data(test_df)
+        #추론
+        lgbm_inference(args,model,test_df)
         return
         
         
@@ -204,6 +170,9 @@ def validate(valid_loader, model, args):
 
 
 def inference(args, test_data):
+    if args.model=='lgbm':
+        return
+    
     print("start inference--------------------------")
     model = load_model(args)
     model.eval()

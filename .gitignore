@@ -4,10 +4,10 @@ output
 wandb
 
 #add when u clone this file
-# conf.yml
+conf.yml
 # README.md
-
-
+.gitignore
+NanumGothic.ttf
 #etc
 /.ipynb_checkpoints
 dkt/.ipynb_checkpoints

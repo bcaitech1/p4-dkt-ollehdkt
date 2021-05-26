@@ -7,6 +7,7 @@ import random
 from sklearn.preprocessing import LabelEncoder
 import numpy as np
 import torch
+from lgbm_utils import *
 
 class Preprocess:
     def __init__(self,args):
@@ -21,35 +22,15 @@ class Preprocess:
     def get_test_data(self):
         return self.test_data
 
-    def split_data(self, data, ratio=0.7, shuffle=True, seed=0):
+    def split_data(self, data, ratio=0.7, shuffle=True, seed=42):
         """
         split data into two parts with a given ratio.
         """
+        #lgbm일 경우
         if self.args.model=='lgbm':
-            # train과 test 데이터셋은 사용자 별로 묶어서 분리를 해주어야함
-            random.seed(42)
-            users = list(zip(data['userID'].value_counts().index, data['userID'].value_counts()))
-            random.shuffle(users)
+            return lgbm_split_data(data,ratio)
 
-            max_train_data_len = ratio*len(data)
-            sum_of_train_data = 0
-            user_ids =[]
-
-            for user_id, count in users:
-                sum_of_train_data += count
-                if max_train_data_len < sum_of_train_data:
-                    break
-                user_ids.append(user_id)
-
-
-            train = data[data['userID'].isin(user_ids)]
-            test = data[data['userID'].isin(user_ids) == False]
-
-            #test데이터셋은 각 유저의 마지막 interaction만 추출
-            test = test[test['userID'] != test['userID'].shift(-1)]
-            return train, test
-
-        
+        #lgbm이 아닐 경우
         if shuffle:
             random.seed(seed) # fix to default seed 0
             random.shuffle(data)
@@ -102,26 +83,7 @@ class Preprocess:
     def __feature_engineering(self, df):
         #TODO
         if self.args.model=='lgbm':
-
-            #유저들의 문제 풀이수, 정답 수, 정답률을 시간순으로 누적해서 계산
-            df['user_correct_answer'] = df.groupby('userID')['answerCode'].transform(lambda x: x.cumsum().shift(1))
-            df['user_total_answer'] = df.groupby('userID')['answerCode'].cumcount()
-            df['user_acc'] = df['user_correct_answer']/df['user_total_answer']
-
-            # testId와 KnowledgeTag의 전체 정답률은 한번에 계산
-            # 아래 데이터는 제출용 데이터셋에 대해서도 재사용
-            correct_t = df.groupby(['testId'])['answerCode'].agg(['mean', 'sum'])
-            correct_t.columns = ["test_mean", 'test_sum']
-            correct_k = df.groupby(['KnowledgeTag'])['answerCode'].agg(['mean', 'sum'])
-            correct_k.columns = ["tag_mean", 'tag_sum']
-
-
-            df = pd.merge(df, correct_t, on=['testId'], how="left")
-            df = pd.merge(df, correct_k, on=['KnowledgeTag'], how="left")
-
-            df.isnull().sum()
-            df = df.fillna(0)
-            return df
+            return make_lgbm_feature(df)
         else:
             #lgbm 외의 다른 모델들의 fe가 필요하다
             return df
@@ -136,7 +98,6 @@ class Preprocess:
         if self.args.model=='lgbm':
             #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
             df.sort_values(by=['userID','Timestamp'], inplace=True)
-            
             return df
         
         df = self.__preprocessing(df, is_train)
