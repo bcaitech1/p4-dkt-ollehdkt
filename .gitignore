@@ -1,0 +1,16 @@
+#folders
+models
+output
+wandb
+
+#add when u clone this file
+# conf.yml
+# README.md
+
+
+#etc
+/.ipynb_checkpoints
+dkt/.ipynb_checkpoints
+__pycache__
+/asset
+*.ipynb

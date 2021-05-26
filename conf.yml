@@ -1,0 +1,57 @@
+model : bert    # {lstm, lstmattn, bert, lgbm}
+
+wandb :
+    using: True
+    project: DKT
+    entity: vail131
+    tags: 
+        - baseline
+
+##main params
+task_name: bert_4layer50ep_seq50
+seed: 42
+device: cuda
+
+data_dir: /opt/ml/input/data/train_dataset
+asset_dir: asset/
+file_name: train_data.csv
+model_dir: models/
+output_dir: output/
+test_file_name: test_data.csv
+max_seq_len: 50
+num_workers: 1
+
+##모델
+hidden_dim : 64
+n_layers : 4
+n_heads : 2
+drop_out: 0.2
+
+#train
+n_epochs: 50
+batch_size: 64
+lr: 0.0001
+clip_grad : 10
+patience : 5
+log_steps : 50
+
+#중요
+optimizer : adam
+scheduler: plateau
+   
+   
+#use only in lgbm
+lgbm:
+    model_params: {
+                    'objective': 'binary', # 이진 분류
+                    'boosting_type': 'gbdt',
+                    'metric': 'auc', # 평가 지표 설정
+                    'feature_fraction': 0.8, # 원래 0.8 피처 샘플링 비율
+                    'bagging_fraction': 0.8, # 원래 0.8 데이터 샘플링 비율
+                    'bagging_freq': 1,
+                    'n_estimators': 10000, # 트리 개수
+                    'early_stopping_rounds': 100,
+                    'seed': 42,
+                    'verbose': -1,
+                    'n_jobs': -1,
+                    }
