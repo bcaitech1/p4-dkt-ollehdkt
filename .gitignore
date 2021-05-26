@@ -4,9 +4,9 @@ output
 wandb
 
 #add when u clone this file
-# conf.yml
-# README.md
-
+conf.yml
+README.md
+.gitignore
 
 #etc
 /.ipynb_checkpoints
