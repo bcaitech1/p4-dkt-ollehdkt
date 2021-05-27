@@ -1,2 +1,2 @@
 # p4-dkt-ollehdkt
-p4-dkt-ollehdkt의 github입니다
+부스트 캠프의 p4-dkt-ollehdkt의 github입니다
