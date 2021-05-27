@@ -21,7 +21,11 @@ def make_lgbm_feature(df):
     correct_t.columns = ["test_mean", 'test_sum']
     correct_k = df.groupby(['KnowledgeTag'])['answerCode'].agg(['mean', 'sum'])
     correct_k.columns = ["tag_mean", 'tag_sum']
-
+    #학생의 학년을 정하고 푼 문제지의 학년합을 구해본다
+    df['test_level']=df['assessmentItemID'].apply(lambda x:int(x[2]))
+    correct_l = df.groupby(['userID'])['test_level'].agg(['mean', 'sum'])
+    correct_l.columns = ["level_mean", 'level_sum']
+    df = pd.merge(df, correct_l, on=['userID'], how="left")
 
     df = pd.merge(df, correct_t, on=['testId'], how="left")
     df = pd.merge(df, correct_k, on=['KnowledgeTag'], how="left")
@@ -32,6 +36,7 @@ def make_lgbm_feature(df):
 
 def lgbm_split_data(data,ratio):
     random.seed(42)
+    
     users = list(zip(data['userID'].value_counts().index, data['userID'].value_counts()))
     random.shuffle(users)
 
@@ -94,6 +99,7 @@ def lgbm_train(args,train_data,valid_data):
     
     _ = lgb.plot_importance(model)
 
+
     return model,auc,acc
     
 def lgbm_inference(args,model, test_data):
@@ -115,3 +121,11 @@ def lgbm_inference(args,model, test_data):
             w.write('{},{}\n'.format(id,p))
 
     print(f"lgbm의 예측파일이 {new_output_path}/{args.task_name}.csv 로 저장됐습니다.")
+
+    save_path=f"{args.output_dir}{args.task_name}/feature{len(FEATS)}_config.json"
+    json.dump(
+        FEATS,
+        open(save_path, "w"),
+        indent=2,
+        ensure_ascii=False,
+    )

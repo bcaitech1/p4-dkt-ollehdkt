@@ -25,8 +25,8 @@ def submit(user_key='', file_path = ''):
     requests.post(url=submit_url, data=body, files={'file': open(file_path, 'rb')})
 
 if __name__ == "__main__":
-    test_dir='/opt/ml'#prediction folder path
+    test_dir='/opt/ml/code/output/lgbm_add_test_data'#prediction folder path
     
     # 아래 글을 통해 자신의 key값 찾아 넣기
     # http://boostcamp.stages.ai/competitions/3/discussion/post/110
-    submit("Bearer 15bdf505e0902975b2e6f578148d22136b2f7717", os.path.join(test_dir, 'answer.csv'))
+    submit("Bearer 15bdf505e0902975b2e6f578148d22136b2f7717", os.path.join(test_dir, 'output.csv'))
