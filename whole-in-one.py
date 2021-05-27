@@ -1,18 +1,25 @@
 import os
-from args import parse_args
-from dkt.dataloader import Preprocess
-from dkt import trainer
-import torch
-from dkt.utils import setSeeds
-import wandb
-from attrdict import AttrDict
 import yaml
 import json
+import argparse
+from attrdict import AttrDict
+
+from dkt.dataloader import Preprocess
+from dkt import trainer
+from dkt.utils import setSeeds
+
+import torch
+import wandb
+
 from train import main as t_main
 from inference import main as i_main
 
 if __name__ == "__main__":
-    with open('/opt/ml/code/conf.yml') as f:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--conf', default='./conf.yml', help='wrtie configuration file root.')
+    term_args = parser.parse_args()
+
+    with open(term_args.conf) as f:
         cf = yaml.load(f, Loader=yaml.FullLoader)
     args = AttrDict(cf)
 
