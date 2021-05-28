@@ -12,6 +12,7 @@ import json
 def main(args):
     wandb.init(project=args.wandb.project, entity=args.wandb.entity)
     wandb.run.name = args.task_name
+    wandb.util.generate_id()
     
     setSeeds(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"

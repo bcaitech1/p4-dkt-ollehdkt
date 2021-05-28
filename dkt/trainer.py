@@ -24,15 +24,17 @@ def run(args, train_data, valid_data):
     train_loader, valid_loader = get_loaders(args, train_data, valid_data)
     
     if args.model=='lgbm':
-        #학습(train_dataset+test_dataset(마지막행 제외)
         
         model,auc,acc=lgbm_train(args,train_data,valid_data)
         wandb.log({"valid_auc":auc, "valid_acc":acc})
         #추론준비
-        
         csv_file_path = os.path.join(args.data_dir, args.test_file_name)
         test_df = pd.read_csv(csv_file_path)#, nrows=100000)
-        
+        #load & apply pre-extracted feature
+        # test_df['distance']=np.load('/opt/ml/np_test_tag_distance_arr.npy')
+        test_df['total_tag_ansrate']=np.load('/opt/ml/np_test_total_tag_ansrate_arr.npy')
+        test_df['user_tag_ansrate']=np.load('/opt/ml/np_test_user_tag_ansrate_arr.npy') 
+
         test_df = make_lgbm_feature(test_df)
         #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
         test_df.sort_values(by=['userID','Timestamp'], inplace=True)

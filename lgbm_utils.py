@@ -8,13 +8,14 @@ import lightgbm as lgb
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
 import numpy as np
+from pre_FE import *
 
-def make_lgbm_feature(df):
+def make_lgbm_feature(df,is_train=True):
     #유저들의 문제 풀이수, 정답 수, 정답률을 시간순으로 누적해서 계산
     df['user_correct_answer'] = df.groupby('userID')['answerCode'].transform(lambda x: x.cumsum().shift(1))
     df['user_total_answer'] = df.groupby('userID')['answerCode'].cumcount()
     df['user_acc'] = df['user_correct_answer']/df['user_total_answer']
-
+    
     # testId와 KnowledgeTag의 전체 정답률은 한번에 계산
     # 아래 데이터는 제출용 데이터셋에 대해서도 재사용
     correct_t = df.groupby(['testId'])['answerCode'].agg(['mean', 'sum'])
@@ -36,10 +37,14 @@ def make_lgbm_feature(df):
 
 def lgbm_split_data(data,ratio):
     random.seed(42)
-    
+    #load & apply pre-extracted feature
+    # data['distance']=np.load('/opt/ml/np_train_tag_distance_arr.npy')
+    data['total_tag_ansrate']=np.load('/opt/ml/np_train_total_tag_ansrate_arr.npy')
+    data['user_tag_ansrate']=np.load('/opt/ml/np_train_user_tag_ansrate_arr.npy')    
+
     users = list(zip(data['userID'].value_counts().index, data['userID'].value_counts()))
     random.shuffle(users)
-
+    
     max_train_data_len = ratio*len(data)
     sum_of_train_data = 0
     user_ids =[]
@@ -67,7 +72,7 @@ def lgbm_train(args,train_data,valid_data):
     delete_feats=['userID','assessmentItemID','testId','answerCode','Timestamp']
 
     FEATS = list(set(train_data.columns)-set(delete_feats))
-    print(f'{len(FEATS)}개의 피처를 사용합니다')
+    print(f'{len(FEATS)}개의 피처를 사용하여 학습합니다')
     print(FEATS)
     # FEATS = ['KnowledgeTag', 'user_correct_answer', 'user_total_answer', 
     #          'user_acc', 'test_mean', 'test_sum', 'tag_mean','tag_sum']
@@ -97,8 +102,13 @@ def lgbm_train(args,train_data,valid_data):
 
     print(f'VALID AUC : {auc} ACC : {acc}\n')
     
-    _ = lgb.plot_importance(model)
-
+    ax = lgb.plot_importance(model)
+    #Feature Importance 저장
+    new_output_path=f'{args.output_dir}{args.task_name}'
+    write_path = os.path.join(new_output_path, "feature_importance.png")
+    if not os.path.exists(new_output_path):
+        os.makedirs(new_output_path) 
+    ax.figure.savefig(write_path)
 
     return model,auc,acc
     
@@ -106,7 +116,8 @@ def lgbm_inference(args,model, test_data):
     
     delete_feats=['userID','assessmentItemID','testId','answerCode','Timestamp']
     FEATS = list(set(test_data.columns)-set(delete_feats))
-    
+    print(f'{len(FEATS)}개의 피처를 사용하여 추론합니다')
+    print(FEATS)
     answer = model.predict(test_data[FEATS])
     
     # 테스트 예측 결과 저장
