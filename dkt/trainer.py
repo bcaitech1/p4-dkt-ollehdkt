@@ -14,6 +14,7 @@ import lightgbm as lgb
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
 from lgbm_utils import *
+from sklearn.model_selection import KFold
 
 import wandb
 
@@ -23,6 +24,8 @@ def run(args, train_data, valid_data):
     
     train_loader, valid_loader = get_loaders(args, train_data, valid_data)
     
+    ### LGBM runner
+
     if args.model=='lgbm':
         #학습
         model,auc,acc=lgbm_train(args,train_data,valid_data)
@@ -37,7 +40,6 @@ def run(args, train_data, valid_data):
         #추론
         lgbm_inference(args,model,test_df)
         return
-        
         
         
     # only when using warmup scheduler
@@ -85,6 +87,85 @@ def run(args, train_data, valid_data):
             scheduler.step(best_auc)
         else:
             scheduler.step()
+
+
+def run_kfold(args, train_data):
+    ### LGBM runner
+    if args.model=='lgbm':
+        lgbm_params=args.lgbm.model_params
+        
+        #학습
+        model,auc,acc=lgbm_train(args,train_data,valid_data)
+        wandb.log({"valid_auc":auc, "valid_acc":acc})
+        #추론준비
+        csv_file_path = os.path.join(args.data_dir, args.test_file_name)
+        test_df = pd.read_csv(csv_file_path)#, nrows=100000)
+        test_df = make_lgbm_feature(test_df)
+        #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
+        test_df.sort_values(by=['userID','Timestamp'], inplace=True)
+        test_df=lgbm_make_test_data(test_df)
+        #추론
+        lgbm_inference(args,model,test_df)
+        return
+        
+    
+    n_splits = 5
+    kfold = KFold(n_splits=n_splits, shuffle=True)
+
+    for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data)):
+        best_val_acc = 0
+        best_val_loss = np.inf
+
+        trn_data = train_data[train_idx]
+        val_data = train_data[valid_idx]
+        
+        train_loader, valid_loader = get_loaders(args, trn_data, val_data)
+
+        # only when using warmup scheduler
+        args.total_steps = int(len(train_loader.dataset) / args.batch_size) * (args.n_epochs)
+        args.warmup_steps = args.total_steps // 10
+                
+        model = get_model(args,args.model)
+        optimizer = get_optimizer(model, args)
+        scheduler = get_scheduler(optimizer, args)
+
+        best_auc = -1
+        early_stopping_counter = 0
+        for epoch in range(args.n_epochs):
+
+            print(f"Start Training: Epoch {epoch + 1}")
+            
+            ### TRAIN
+            train_auc, train_acc, train_loss = train(train_loader, model, optimizer, args)
+            
+            ### VALID
+            auc, acc,_ , _ = validate(valid_loader, model, args)
+
+            ### TODO: model save or early stopping
+            wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
+                    "valid_auc":auc, "valid_acc":acc})
+            if auc > best_auc:
+                best_auc = auc
+                # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
+                model_to_save = model.module if hasattr(model, 'module') else model
+                save_checkpoint({
+                    'epoch': epoch + 1,
+                    'state_dict': model_to_save.state_dict(),
+                    },
+                    (args.model_dir + args.task_name), f'{args.task_name}_{fold+1}fold.pt',
+                )
+                early_stopping_counter = 0
+            else:
+                early_stopping_counter += 1
+                if early_stopping_counter >= args.patience:
+                    print(f'EarlyStopping counter: {early_stopping_counter} out of {args.patience}')
+                    break
+
+            # scheduler
+            if args.scheduler == 'plateau':
+                scheduler.step(best_auc)
+            else:
+                scheduler.step()
 
 
 def train(train_loader, model, optimizer, args):
@@ -210,6 +291,57 @@ def inference(args, test_data):
 
 
 
+def inference_kfold(args, test_data):
+    if args.model=='lgbm':
+        return
+    
+    oof_pred = None
+
+    print("start inference--------------------------")
+    for fold in range(args.n_fold):
+        print(f'{fold+1} fold inference')
+        model = load_model_kfold(args, fold)
+        model.eval()
+        _, test_loader = get_loaders(args, None, test_data)
+        
+        
+        fold_preds = []
+        
+        for step, batch in tqdm(enumerate(test_loader)):
+            input = process_batch(batch, args)
+            preds = model(input)
+
+            # predictions
+            preds = preds[:,-1]
+            
+            if args.device == 'cuda':
+                preds = preds.to('cpu').detach().numpy()
+            else: # cpu
+                preds = preds.detach().numpy()
+                
+            fold_preds+=list(preds)
+        
+        fold_pred = np.array(fold_preds)
+
+        if oof_pred is None:
+            oof_pred = fold_pred / args.n_fold
+        else:
+            oof_pred += fold_pred / args.n_fold
+        
+
+
+    new_output_path=f'{args.output_dir}/{args.task_name}'
+    write_path = os.path.join(new_output_path, "output.csv")
+
+    if not os.path.exists(new_output_path):
+        os.makedirs(new_output_path)    
+    with open(write_path, 'w', encoding='utf8') as w:
+        print("writing prediction : {}".format(write_path))
+        w.write("id,prediction\n")
+        for id, p in enumerate(oof_pred):
+            w.write('{},{}\n'.format(id,p))
+
+
 
 def get_model(args,model_name:str):
     """
@@ -303,6 +435,20 @@ def save_checkpoint(state, model_dir, model_filename):
 
 def load_model(args):
     model_path = os.path.join(args.model_dir, f'{args.task_name}.pt')
+    print("Loading Model from:", model_path)
+    load_state = torch.load(model_path)
+    model = get_model(args, args.model)
+
+    # 1. load model state
+    model.load_state_dict(load_state['state_dict'], strict=True)
+    
+    print("Loading Model from:", model_path, "...Finished.")
+    return model
+
+
+
+def load_model_kfold(args, fold):
+    model_path = os.path.join((args.model_dir + args.task_name), f'{args.task_name}_{fold+1}fold.pt')
     print("Loading Model from:", model_path)
     load_state = torch.load(model_path)
     model = get_model(args, args.model)

@@ -1,25 +1,30 @@
-model : lgbm    # {lstm, lstmattn, bert, lgbm}
+model : bert    # {lstm, lstmattn, bert, lgbm}
 
 wandb :
     using: True
     project: DKT
-    entity: vail131
+
+    ## 자신의 wandb 아이디를 적어주세요
+    entity: pomdeyo
     tags: 
         - baseline
 
 ##main params
-task_name: lgbm_test
+task_name: bert_embedding test
 seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
-asset_dir: asset/
 file_name: train_data.csv
+test_file_name: test_data.csv
+
+asset_dir: asset/
 model_dir: models/
 output_dir: output/
-test_file_name: test_data.csv
-max_seq_len: 20
+
+max_seq_len: 50
 num_workers: 1
+n_fold : 5
 
 ##모델
 hidden_dim : 128
@@ -28,15 +33,15 @@ n_heads : 2
 drop_out: 0.2
 
 #train
-n_epochs: 50
+n_epochs: 100
 batch_size: 64
 lr: 0.0001
 clip_grad : 10
-patience : 5
+patience : 10
 log_steps : 50
 
 #중요
-optimizer : adam
+optimizer : adamW
 scheduler: plateau
    
    
@@ -50,11 +55,13 @@ lgbm:
                     'bagging_fraction': 0.8, # 원래 0.8 데이터 샘플링 비율
                     'bagging_freq': 1,
                     'n_estimators': 10000, # 트리 개수
+                    'early_stopping_rounds': 100,
                     'seed': 42,
                     'verbose': -1,
                     'n_jobs': -1,
                     }
-
+    
     verbose_eval : 100 #ori 100
     num_boost_round : 500
     early_stopping_rounds : 100
+        

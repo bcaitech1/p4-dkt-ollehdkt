@@ -205,13 +205,13 @@ class Bert(nn.Module):
 
         # Embedding 
         # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
-        self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
-        self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
-        self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
-        self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
+        self.embedding_interaction = nn.Embedding(3, 1)
+        self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim)
+        self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//2)
+        self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//2)
 
         # embedding combination projection
-        self.comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim)
+        self.comb_proj = nn.Linear((self.hidden_dim * 2) + 1, self.hidden_dim)
 
         # Bert config
         self.config = BertConfig( 
@@ -234,6 +234,7 @@ class Bert(nn.Module):
 
     def forward(self, input):
         test, question, tag, _, mask, interaction, _ = input
+        
         batch_size = interaction.size(0)
 
         # 신나는 embedding
@@ -242,12 +243,11 @@ class Bert(nn.Module):
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
         embed_tag = self.embedding_tag(tag)
+        
 
         embed = torch.cat([embed_interaction,
-        
                            embed_test,
                            embed_question,
-        
                            embed_tag,], 2)
 
         X = self.comb_proj(embed)

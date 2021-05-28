@@ -24,15 +24,15 @@ def main(args):
     preprocess.load_train_data(args.file_name)
     train_data = preprocess.get_train_data()
     
-    train_data, valid_data = preprocess.split_data(train_data)
-    
-    
-    trainer.run(args, train_data, valid_data)
+    # train_data, valid_data = preprocess.split_data(train_data)
+    # trainer.run(args, train_data, valid_data)
+
+    trainer.run_kfold(args, train_data)
     
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--conf', default='./conf.yml', help='wrtie configuration file root.')
+    parser.add_argument('-c', '--conf', default='/opt/ml/git/p4-dkt-ollehdkt/conf.yml', help='wrtie configuration file root.')
     term_args = parser.parse_args()
 
     with open(term_args.conf) as f:
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     main(args)
     
     args.pop('wandb')
-    args.pop('lgbm')
+
     save_path=f"{args.output_dir}{args.task_name}/exp_config.json"
     if args.model=='lgbm':
         args=args.lgbm
