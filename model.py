@@ -18,25 +18,6 @@ from transformers.models.roberta.modeling_roberta import RobertaConfig,RobertaEn
 from transformers import BertPreTrainedModel
 
 
-class CFG:
-    seed=42
-    device='cuda 0'
-    batch_size=16
-
-    dropout=0.2
-    emb_size=128
-    hidden_size=128
-    n_layers=2
-    nheads=8
-
-    seq_len=32
-    target_size=3
-
-
-class MyTransFormer(nn.Module):
-    def __init__(self,cfg):
-        super().__init__()
-
 class LSTM(nn.Module):
 
     def __init__(self, args):
