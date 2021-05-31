@@ -1,4 +1,4 @@
-model : bert    # {lstm, lstmattn, bert, lgbm}
+model : lstmroberta    # {lstm, lstmattn, bert, lgbm}
 
 wandb :
     using: True
@@ -10,7 +10,7 @@ wandb :
         - baseline
 
 ##main params
-task_name: bert_embedding test
+task_name: lstmroberta_Kfold_test
 seed: 42
 device: cuda
 
@@ -24,7 +24,7 @@ output_dir: output/
 
 max_seq_len: 50
 num_workers: 1
-n_fold : 5
+n_fold : 8
 
 ##모델
 hidden_dim : 128
@@ -33,11 +33,11 @@ n_heads : 2
 drop_out: 0.2
 
 #train
-n_epochs: 100
+n_epochs: 200
 batch_size: 64
 lr: 0.0001
 clip_grad : 10
-patience : 10
+patience : 20
 log_steps : 50
 
 #중요

@@ -8,7 +8,7 @@ from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .criterion import get_criterion
 from .metric import get_metric
-from .model import LSTM, Bert, LSTMATTN
+from .model import *
 import json
 import lightgbm as lgb
 from sklearn.metrics import roc_auc_score
@@ -109,7 +109,7 @@ def run_kfold(args, train_data):
         return
         
     
-    n_splits = 5
+    n_splits = args.n_fold
     kfold = KFold(n_splits=n_splits, shuffle=True)
 
     for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data)):
@@ -350,6 +350,7 @@ def get_model(args,model_name:str):
     if model_name == 'lstm': model = LSTM(args)
     if model_name == 'lstmattn': model = LSTMATTN(args)
     if model_name == 'bert': model = Bert(args)
+    if model_name == 'lstmroberta' : model = LSTMRobertaATTN(args)
     
 
     model.to(args.device)
@@ -366,12 +367,18 @@ def process_batch(batch, args):
     mask = mask.type(torch.FloatTensor)
     correct = correct.type(torch.FloatTensor)
 
+    """
+    interaction에서 rolling의 이유
+    - 이전 time_step에서 푼 문제를 맞췄는지 틀렸는지를 현재 time step의 input으로 넣기 위해서 rolling을 사용한다.
+    """
+
     #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     #    saint의 경우 decoder에 들어가는 input이다
     interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
     interaction = interaction.roll(shifts=1, dims=1)
-    interaction[:, 0] = 0 # set padding index to the first sequence
-    interaction = (interaction * mask).to(torch.int64)
+    interaction_mask = mask.roll(shifts=1, dims=1)
+    interaction_mask[:, 0] = 0
+    interaction = (interaction * interaction_mask).to(torch.int64)
     # print(interaction)
     # exit()
     #  test_id, question_id, tag
