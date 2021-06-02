@@ -83,7 +83,7 @@ class Preprocess:
     def __feature_engineering(self, df):
         #TODO
         if self.args.model=='lgbm':
-            return make_lgbm_feature(df)
+            return make_lgbm_feature(self.args, df)
         else:
             #lgbm 외의 다른 모델들의 fe가 필요하다
             return df
@@ -92,7 +92,7 @@ class Preprocess:
     def load_data_from_file(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
         df = pd.read_csv(csv_file_path)#, nrows=100000)
-        df = self.__feature_engineering(df)
+        # df = self.__feature_engineering(df)
          
         
         if self.args.model=='lgbm':
@@ -100,7 +100,7 @@ class Preprocess:
             df.sort_values(by=['userID','Timestamp'], inplace=True)
             return df
         
-        df = self.__preprocessing(df, is_train)
+        df = self.__preprocessing(df)
        
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용     
         self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))

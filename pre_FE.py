@@ -1,5 +1,6 @@
 def user_tag_ansrate_feature(df):
-    main_arr=[]
+    tag_ansrate=[]
+    tag_len=[]
     for uid in df['userID'].unique():
         interactions=df[df['userID']==uid]
         user_tag_dict=defaultdict(list)
@@ -7,13 +8,18 @@ def user_tag_ansrate_feature(df):
             tag=interactions.iloc[idx]['KnowledgeTag']
             answer=interactions.iloc[idx]['answerCode']
             if idx==0 or len(user_tag_dict[tag])==0 :
-                main_arr.append(0)
+                tag_ansrate.append(0)
             else :
-                main_arr.append(sum(user_tag_dict[tag])/len(user_tag_dict[tag]))
+                tag_ansrate.append(sum(user_tag_dict[tag])/len(user_tag_dict[tag]))
+            
 
-            user_tag_dict[tag].append(answer)
-    print(len(main_arr))
-    return main_arr
+            tag_len.append(len(user_tag_dict[tag]))    
+            user_tag_dict[tag].append(0 if answer==-1 else answer)
+            
+    print(len(tag_ansrate))
+    print(len(tag_len))
+    #유저가 현재 풀고있는 문제 유형을 몇번이나 풀었고 그에 따른 정답률를 리턴한다 
+    return tag_ansrate,tag_len
 
 def total_tag_ans_rate_feature(df):
     #태그별 정답률

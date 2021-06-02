@@ -25,7 +25,7 @@ def submit(user_key='', file_path = ''):
     requests.post(url=submit_url, data=body, files={'file': open(file_path, 'rb')})
 
 if __name__ == "__main__":
-    test_dir='/opt/ml/code/output/add_user_total_tag_final'#prediction folder path
+    test_dir='/opt/ml/code/output/kfold_user_split_test'#prediction folder path
     print(test_dir, "에 있는 파일을 제출하였습니다")
     # 아래 글을 통해 자신의 key값 찾아 넣기
     # http://boostcamp.stages.ai/competitions/3/discussion/post/110

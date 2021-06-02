@@ -23,8 +23,8 @@ def run(args, train_data, valid_data):
     
     train_loader, valid_loader = get_loaders(args, train_data, valid_data)
     
-    if args.model=='lgbm':
-        
+    if args.model=='lgbm' and args.use_kfold == False:
+        print("k-fold를 사용하지 않습니다","-"*80)
         model,auc,acc=lgbm_train(args,train_data,valid_data)
         wandb.log({"valid_auc":auc, "valid_acc":acc})
         #추론준비
@@ -32,17 +32,64 @@ def run(args, train_data, valid_data):
         test_df = pd.read_csv(csv_file_path)#, nrows=100000)
         #load & apply pre-extracted feature
         # test_df['distance']=np.load('/opt/ml/np_test_tag_distance_arr.npy')
-        test_df['total_tag_ansrate']=np.load('/opt/ml/np_test_total_tag_ansrate_arr.npy')
-        test_df['user_tag_ansrate']=np.load('/opt/ml/np_test_user_tag_ansrate_arr.npy') 
+        # test_df['co_distance']=np.load('/opt/ml/np_test_correct_tag_trace.npy')
+        # test_df['total_tag_ansrate']=np.load('/opt/ml/np_test_total_tag_ansrate_arr.npy')
+        # test_df['user_tag_ansrate']=np.load('/opt/ml/np_test_user_tag_ansrate_arr.npy') 
 
-        test_df = make_lgbm_feature(test_df)
+        test_df = make_lgbm_feature(args,test_df)
         #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
         test_df.sort_values(by=['userID','Timestamp'], inplace=True)
         test_df=lgbm_make_test_data(test_df)
         #추론
         lgbm_inference(args,model,test_df)
         return
+    else :
+        print("k-fold를 사용합니다","-"*80)
+        csv_file_path = os.path.join(args.data_dir, args.file_name)
+        train_df = pd.read_csv(csv_file_path)#, nrows=100000)
         
+        csv_file_path = os.path.join(args.data_dir, args.test_file_name)
+        test_df = pd.read_csv(csv_file_path)#, nrows=100000)
+        
+        if args.use_test_data:#test의 데이터까지 사용할 경우
+            train_df=make_sharing_feature(args)
+            
+        train_df=make_lgbm_feature(args,train_df)
+        test_df=make_lgbm_feature(args,test_df)
+        
+        delete_feats=['userID','assessmentItemID','testId','answerCode','Timestamp','sec_time']
+        features=list(set(test_df.columns)-set(delete_feats))
+
+        print(f'사용한 피처는 다음과 같습니다')
+        print(features)
+        y=train_df['answerCode']
+        if args.split_by_user: #유저별로 train/valid set을 나눌 때
+            y_oof,pred,fi,score,acc=make_lgb_user_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
+            wandb.log({"valid_auc":score, "valid_acc":acc})
+        else : #skl split라이브러리를 이용하여 유저 구분없이 나눌 때 
+            y_oof,pred,fi=make_lgb_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
+        
+        
+        new_output_path=f'{args.output_dir}{args.task_name}'
+        write_path = os.path.join(new_output_path, "output.csv")
+        if not os.path.exists(new_output_path):
+            os.makedirs(new_output_path)    
+        with open(write_path, 'w', encoding='utf8') as w:
+            print("writing prediction : {}".format(write_path))
+            w.write("id,prediction\n")
+            for id, p in enumerate(pred):
+                w.write('{},{}\n'.format(id,p))
+
+        print(f"lgbm의 예측파일이 {new_output_path}/{args.task_name}.csv 로 저장됐습니다.")
+
+        save_path=f"{args.output_dir}{args.task_name}/feature{len(features)}_config.json"
+        json.dump(
+            features,
+            open(save_path, "w"),
+            indent=2,
+            ensure_ascii=False,
+        )
+        return
         
         
     # only when using warmup scheduler
@@ -234,17 +281,17 @@ def get_model(args,model_name:str):
 def process_batch(batch, args):
     test, question, tag, correct, mask = batch
     
-    
+
     # change to float
     mask = mask.type(torch.FloatTensor)
     correct = correct.type(torch.FloatTensor)
-
-    #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
-    #    saint의 경우 decoder에 들어가는 input이다
+    
+    # interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
     interaction = interaction.roll(shifts=1, dims=1)
-    interaction[:, 0] = 0 # set padding index to the first sequence
-    interaction = (interaction * mask).to(torch.int64)
+    interaction_mask = mask.roll(shifts=1, dims=1)
+    interaction_mask[:, 0] = 0
+    interaction = (interaction * interaction_mask).to(torch.int64)
     # print(interaction)
     # exit()
     #  test_id, question_id, tag
