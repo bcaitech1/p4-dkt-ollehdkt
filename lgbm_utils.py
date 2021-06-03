@@ -45,10 +45,15 @@ def get_sharing_feature(args):
     assessmentItemID_mean_sum = df.groupby(['assessmentItemID'])['answerCode'].agg(['mean', 'sum']).to_dict()
     KnowledgeTag_mean_sum = df.groupby(['KnowledgeTag'])['answerCode'].agg(['mean', 'sum']).to_dict()
     
-    return testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum
+    # 시간 피처
+    testId_time_agg = df.groupby(['testId'])['solve_time'].agg(['mean','std','skew']).to_dict()
+    assessment_time_agg=df.groupby(['assessmentItemID'])['solve_time'].agg(['mean','std','skew']).to_dict()
+    KnowledgeTag_time_agg = df.groupby(['KnowledgeTag'])['solve_time'].agg(['mean','std','skew']).to_dict()
+
+    return testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg
 
 def make_lgbm_feature(args, df,is_train=True):
-    testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum=get_sharing_feature(args)
+    testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg=get_sharing_feature(args)
 
     item_size = df[['assessmentItemID', 'testId']].drop_duplicates().groupby('testId').size()
     testId2maxlen = item_size.to_dict() # 중복해서 풀이할 놈들을 제거하기 위해
@@ -59,6 +64,16 @@ def make_lgbm_feature(args, df,is_train=True):
     df['ItemID_sum'] = df.assessmentItemID.map(assessmentItemID_mean_sum['sum'])
     df["tag_mean"] = df.KnowledgeTag.map(KnowledgeTag_mean_sum['mean'])
     df['tag_sum'] = df.KnowledgeTag.map(KnowledgeTag_mean_sum['sum'])  
+
+    df['test_t_mean']= df.testId.map(testId_time_agg['mean'])
+    df['test_t_std']= df.testId.map(testId_time_agg['std'])
+    df['test_t_skew']= df.testId.map(testId_time_agg['skew'])
+    df['assess_t_mean']= df.assessmentItemID.map(assessment_time_agg['mean'])
+    df['assess_t_std']= df.assessmentItemID.map(assessment_time_agg['std'])
+    df['assess_t_skew']= df.assessmentItemID.map(assessment_time_agg['skew'])
+    df['tag_t_mean']= df.KnowledgeTag.map(KnowledgeTag_time_agg['mean'])
+    df['tag_t_std']= df.KnowledgeTag.map(KnowledgeTag_time_agg['std'])
+    df['tag_t_skew']= df.KnowledgeTag.map(KnowledgeTag_time_agg['skew'])
     ###서일님 피처
     # 유저가 푼 시험지에 대해, 유저의 전체 정답/풀이횟수/정답률 계산 (3번 풀었으면 3배)
     df_group = df.groupby(['userID','testId'])['answerCode']
@@ -94,24 +109,24 @@ def make_lgbm_feature(args, df,is_train=True):
     # non-sequential feature in here
     # testId와 KnowledgeTag의 전체 정답률은 한번에 계산
     # 아래 데이터는 제출용 데이터셋에 대해서도 재사용
-    group_list=['KnowledgeTag','testId','userID']
+    group_list=['userID']
     
     #문제 태그로 groupby했을 때 적용할 함수들
-    tag_agg_dict={
-        # 'answerCode': ['count','mean', 'sum'], #태그개수,태그별 정답률, 해당 태그를 맞춘 개수
-        # 'userID' :['nunique'], #해당 태그를 풀이한 유저의 수(인기도), 
-        # 'assessmentItemID':['nunique'], #해당 태그가 얼마나 여러 문제번호에 분포돼있는지, 왜도(문제지의 어느부분인지)
-        'solve_time' :['mean','std','skew'],
-    }
+    # tag_agg_dict={
+    #     # 'answerCode': ['count','mean', 'sum'], #태그개수,태그별 정답률, 해당 태그를 맞춘 개수
+    #     # 'userID' :['nunique'], #해당 태그를 풀이한 유저의 수(인기도), 
+    #     # 'assessmentItemID':['nunique'], #해당 태그가 얼마나 여러 문제번호에 분포돼있는지, 왜도(문제지의 어느부분인지)
+    #     'solve_time' :['mean','std','skew'],
+    # }
     
     #시험지번호로 groupby했을 때 적용할 함수들
-    test_agg_dict={
-        'solve_time' :['mean','std','skew'],
-        # 'answerCode': ['count','mean', 'sum'], #시험지별 제출개수 ,시험지별 정답률, 해당 시험지를 풀이하여 맞은 개수
-        # 'userID' :['nunique'], #해당 시험지를 풀이한 유저의 수(인기도), 
-        # 'assessmentItemID':['nunique'], #해당 시험지에 문제가 얼마나 분포돼있는지, 왜도(문제지의 어느부분인지)
+    # test_agg_dict={
+    #     'solve_time' :['mean','std','skew'],
+    #     # 'answerCode': ['count','mean', 'sum'], #시험지별 제출개수 ,시험지별 정답률, 해당 시험지를 풀이하여 맞은 개수
+    #     # 'userID' :['nunique'], #해당 시험지를 풀이한 유저의 수(인기도), 
+    #     # 'assessmentItemID':['nunique'], #해당 시험지에 문제가 얼마나 분포돼있는지, 왜도(문제지의 어느부분인지)
         
-    }
+    # }
     
     #사용자별로 groupby했을 때 적용할 함수들, answercode 관련 column은 위에서 이미 정의함
     uid_agg_dict={
@@ -123,7 +138,7 @@ def make_lgbm_feature(args, df,is_train=True):
         'solve_time' :['mean','std','skew'],
     }
     
-    agg_dict_list=[tag_agg_dict,test_agg_dict,uid_agg_dict]
+    agg_dict_list=[uid_agg_dict]
     
     
     for group, now_agg in zip(group_list,agg_dict_list):

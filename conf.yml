@@ -8,7 +8,7 @@ wandb :
         - baseline
 
 ##main params
-task_name: 5fold_user_split_use_real_test_data
+task_name: 5fold_add_global_time_feature_plus_usertime
 seed: 42
 device: cuda
 
