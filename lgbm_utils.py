@@ -166,13 +166,8 @@ def make_lgbm_feature(args, df,is_train=True):
     
     return lgbm_feature_preprocessing(df,features, do_imputing=True)
 
-def lgbm_split_data(data,ratio):
-    random.seed(42)
-    #distance 적용
-    # data['distance']=np.load('/opt/ml/np_train_tag_distance_arr.npy')
-    # data['co_distance']=np.load('/opt/ml/np_train_correct_tag_trace.npy')
-    # data['total_tag_ansrate']=np.load('/opt/ml/np_train_total_tag_ansrate_arr.npy')
-    # data['user_tag_ansrate']=np.load('/opt/ml/np_train_user_tag_ansrate_arr.npy')      
+def lgbm_split_data(data,ratio,seed=42):
+    random.seed(seed)
 
     users = list(zip(data['userID'].value_counts().index, data['userID'].value_counts()))
     random.shuffle(users)

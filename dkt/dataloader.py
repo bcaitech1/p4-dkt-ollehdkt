@@ -28,7 +28,7 @@ class Preprocess:
         """
         #lgbm일 경우
         if self.args.model=='lgbm':
-            return lgbm_split_data(data,ratio)
+            return lgbm_split_data(data,ratio,seed)
 
         #lgbm이 아닐 경우
         if shuffle:
@@ -92,15 +92,16 @@ class Preprocess:
     def load_data_from_file(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
         df = pd.read_csv(csv_file_path)#, nrows=100000)
-        # df = self.__feature_engineering(df)
+        
          
         
         if self.args.model=='lgbm':
             #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
             df.sort_values(by=['userID','Timestamp'], inplace=True)
             return df
-        
-        df = self.__preprocessing(df)
+
+        df = self.__feature_engineering(df)
+        df = self.__preprocessing(df, is_train)
        
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용     
         self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))

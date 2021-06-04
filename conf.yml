@@ -1,23 +1,23 @@
-model : lgbm    # {lstm, lstmattn, bert, lgbm}
+model : lstm   # {lstm, lstmattn, bert, lgbm}
 
 wandb :
-    using: True
+    using: False
     project: DKT
     entity: vail131
     tags: 
         - baseline
 
 ##main params
-task_name: 5fold_add_global_time_feature_plus_usertime
+task_name: test
 seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
 asset_dir: asset/
-file_name: time_train.csv
+file_name: train_data.csv
 model_dir: models/
 output_dir: output/
-test_file_name: time_test.csv
+test_file_name: test_data.csv
 
 num_workers: 1
 
@@ -35,9 +35,10 @@ lr: 0.0001
 clip_grad : 10
 patience : 5
 log_steps : 50
+split_ratio : 0.7
 
 #중요
-optimizer : adam
+optimizer : adamW
 scheduler: plateau
    
 
@@ -47,10 +48,10 @@ lgbm:
                     'objective': 'binary', # 이진 분류
                     'boosting_type': 'gbdt',
                     'metric': 'auc', # 평가 지표 설정
-                    # 'feature_fraction': 0.8, # 원래 0.8 피처 샘플링 비율
-                    # 'bagging_fraction': 0.8, # 원래 0.8 데이터 샘플링 비율
-                    # 'bagging_freq': 1,
-                    # 'n_estimators': 10000, # 트리 개수
+                    'feature_fraction': 0.7, # 원래 0.8 피처 샘플링 비율
+                    'bagging_fraction': 0.7, # 원래 0.8 데이터 샘플링 비율
+                    'bagging_freq': 1,
+                    'n_estimators': 10000, # 트리 개수
                     'seed': 42,
                     'verbose': -1,
                     'n_jobs': -1,

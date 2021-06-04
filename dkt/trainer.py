@@ -23,18 +23,15 @@ def run(args, train_data, valid_data):
     
     train_loader, valid_loader = get_loaders(args, train_data, valid_data)
     
+    #lgbm은 학습과 추론을 함께함
     if args.model=='lgbm' and args.use_kfold == False:
         print("k-fold를 사용하지 않습니다","-"*80)
         model,auc,acc=lgbm_train(args,train_data,valid_data)
-        wandb.log({"valid_auc":auc, "valid_acc":acc})
+        if args.wandb.using:
+            wandb.log({"valid_auc":auc, "valid_acc":acc})
         #추론준비
         csv_file_path = os.path.join(args.data_dir, args.test_file_name)
         test_df = pd.read_csv(csv_file_path)#, nrows=100000)
-        #load & apply pre-extracted feature
-        # test_df['distance']=np.load('/opt/ml/np_test_tag_distance_arr.npy')
-        # test_df['co_distance']=np.load('/opt/ml/np_test_correct_tag_trace.npy')
-        # test_df['total_tag_ansrate']=np.load('/opt/ml/np_test_total_tag_ansrate_arr.npy')
-        # test_df['user_tag_ansrate']=np.load('/opt/ml/np_test_user_tag_ansrate_arr.npy') 
 
         test_df = make_lgbm_feature(args,test_df)
         #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
@@ -43,7 +40,7 @@ def run(args, train_data, valid_data):
         #추론
         lgbm_inference(args,model,test_df)
         return
-    else :
+    elif args.model=='lgbm' and args.use_kfold :
         print("k-fold를 사용합니다","-"*80)
         csv_file_path = os.path.join(args.data_dir, args.file_name)
         train_df = pd.read_csv(csv_file_path)#, nrows=100000)
@@ -62,10 +59,11 @@ def run(args, train_data, valid_data):
 
         print(f'사용한 피처는 다음과 같습니다')
         print(features)
-        y=train_df['answerCode']
+
         if args.split_by_user: #유저별로 train/valid set을 나눌 때
             y_oof,pred,fi,score,acc=make_lgb_user_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
-            wandb.log({"valid_auc":score, "valid_acc":acc})
+            if args.wandb.using:
+                wandb.log({"valid_auc":score, "valid_acc":acc})
         else : #skl split라이브러리를 이용하여 유저 구분없이 나눌 때 
             y_oof,pred,fi=make_lgb_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
         
@@ -113,7 +111,8 @@ def run(args, train_data, valid_data):
         auc, acc,_ , _ = validate(valid_loader, model, args)
 
         ### TODO: model save or early stopping
-        wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
+        if args.wandb.using:
+            wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
                   "valid_auc":auc, "valid_acc":acc})
         if auc > best_auc:
             best_auc = auc
@@ -250,7 +249,7 @@ def inference(args, test_data):
             
         total_preds+=list(preds)
     
-    new_output_path=f'{args.output_dir}/{args.task_name}'
+    new_output_path=f'{args.output_dir}{args.task_name}'
     write_path = os.path.join(new_output_path, "output.csv")
     if not os.path.exists(new_output_path):
         os.makedirs(new_output_path)    

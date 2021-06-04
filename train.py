@@ -10,9 +10,10 @@ import yaml
 import json
 
 def main(args):
-    wandb.init(project=args.wandb.project, entity=args.wandb.entity)
-    wandb.run.name = args.task_name
-    wandb.util.generate_id()
+    if args.wandb.using:
+        wandb.init(project=args.wandb.project, entity=args.wandb.entity)
+        wandb.run.name = args.task_name
+        wandb.util.generate_id()
     
     setSeeds(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -21,7 +22,7 @@ def main(args):
     preprocess = Preprocess(args)
     preprocess.load_train_data(args.file_name)
     train_data = preprocess.get_train_data()
-    train_data, valid_data = preprocess.split_data(train_data)
+    train_data, valid_data = preprocess.split_data(train_data, ratio=args.split_ratio, seed=args.seed)
     
     
     trainer.run(args, train_data, valid_data)
@@ -36,10 +37,10 @@ if __name__ == "__main__":
     main(args)
     
     args.pop('wandb')
-    args.pop('lgbm')
     save_path=f"{args.output_dir}{args.task_name}/exp_config.json"
     if args.model=='lgbm':
         args=args.lgbm
+        
     else :
         args.pop('lgbm')
     json.dump(
