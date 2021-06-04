@@ -1,0 +1,68 @@
+model : lstm   # {lstm, lstmattn, bert, lgbm}
+
+wandb :
+    using: False
+    project: DKT
+    entity: vail131
+    tags: 
+        - baseline
+
+##main params
+task_name: test
+seed: 42
+device: cuda
+
+data_dir: /opt/ml/input/data/train_dataset
+asset_dir: asset/
+file_name: train_data.csv
+model_dir: models/
+output_dir: output/
+test_file_name: test_data.csv
+
+num_workers: 1
+
+##non-lgbm 모델
+max_seq_len: 20
+hidden_dim : 128
+n_layers : 4
+n_heads : 2
+drop_out: 0.2
+
+#train
+n_epochs: 50
+batch_size: 64
+lr: 0.0001
+clip_grad : 10
+patience : 5
+log_steps : 50
+split_ratio : 0.7
+
+#중요
+optimizer : adamW
+scheduler: plateau
+   
+
+#use only in lgbm
+lgbm:
+    model_params: {
+                    'objective': 'binary', # 이진 분류
+                    'boosting_type': 'gbdt',
+                    'metric': 'auc', # 평가 지표 설정
+                    'feature_fraction': 0.7, # 원래 0.8 피처 샘플링 비율
+                    'bagging_fraction': 0.7, # 원래 0.8 데이터 샘플링 비율
+                    'bagging_freq': 1,
+                    'n_estimators': 10000, # 트리 개수
+                    'seed': 42,
+                    'verbose': -1,
+                    'n_jobs': -1,
+                    }
+
+    verbose_eval : 100 #ori 100
+    num_boost_round : 1000
+    early_stopping_rounds : 100
+
+make_sharing_feature : True #extract statistics featrue from train + test(except last rows)
+use_test_data : True #use test_data for train
+use_kfold : True #n개의 fold를 이용하여 k-fold를 진행한다.
+n_fold : 5
+split_by_user : True #k-fold를 수행할 dataset을 user 기준으로 split
