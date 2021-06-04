@@ -1,4 +1,5 @@
 import os
+import json
 import torch
 import numpy as np
 
@@ -9,12 +10,13 @@ from .scheduler import get_scheduler
 from .criterion import get_criterion
 from .metric import get_metric
 from .model import *
-import json
+from lgbm_utils import *
+
 import lightgbm as lgb
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
-from lgbm_utils import *
 from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 
 import wandb
 
@@ -90,32 +92,45 @@ def run(args, train_data, valid_data):
 
 
 def run_kfold(args, train_data):
+    n_splits = args.n_fold
+
+    if args.use_stratify == True:
+        kfold = StratifiedKFold(n_splits=n_splits, shuffle=True)
+    else:
+        kfold = KFold(n_splits=n_splits, shuffle=True)
+
     ### LGBM runner
     if args.model=='lgbm':
         lgbm_params=args.lgbm.model_params
+
+        for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data)):
+            train_data, valid_data = train_data[train_idx], train_data[valid_idx]
+
+            #학습
+            model,auc,acc=lgbm_train(args,train_data,valid_data)
+            wandb.log({"valid_auc":auc, "valid_acc":acc})
+            #추론준비
+            csv_file_path = os.path.join(args.data_dir, args.test_file_name)
+            test_df = pd.read_csv(csv_file_path)#, nrows=100000)
+            test_df = make_lgbm_feature(test_df)
+            #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
+            test_df.sort_values(by=['userID','Timestamp'], inplace=True)
+            test_df=lgbm_make_test_data(test_df)
+            #추론
+            lgbm_inference(args,model,test_df)
+            
         
-        #학습
-        model,auc,acc=lgbm_train(args,train_data,valid_data)
-        wandb.log({"valid_auc":auc, "valid_acc":acc})
-        #추론준비
-        csv_file_path = os.path.join(args.data_dir, args.test_file_name)
-        test_df = pd.read_csv(csv_file_path)#, nrows=100000)
-        test_df = make_lgbm_feature(test_df)
-        #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
-        test_df.sort_values(by=['userID','Timestamp'], inplace=True)
-        test_df=lgbm_make_test_data(test_df)
-        #추론
-        lgbm_inference(args,model,test_df)
         return
-        
     
-    n_splits = args.n_fold
-    kfold = KFold(n_splits=n_splits, shuffle=True)
 
-    for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data)):
-        best_val_acc = 0
-        best_val_loss = np.inf
+    target = get_target(train_data)
 
+    val_auc = 0
+    val_acc = 0
+
+    oof = np.zeros(train_data.shape[0])
+
+    for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data, target)):
         trn_data = train_data[train_idx]
         val_data = train_data[valid_idx]
         
@@ -130,6 +145,9 @@ def run_kfold(args, train_data):
         scheduler = get_scheduler(optimizer, args)
 
         best_auc = -1
+        best_acc = 0
+        best_preds = None
+
         early_stopping_counter = 0
         for epoch in range(args.n_epochs):
 
@@ -139,13 +157,15 @@ def run_kfold(args, train_data):
             train_auc, train_acc, train_loss = train(train_loader, model, optimizer, args)
             
             ### VALID
-            auc, acc,_ , _ = validate(valid_loader, model, args)
+            auc, acc, preds , _ = validate(valid_loader, model, args)
 
             ### TODO: model save or early stopping
             wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
                     "valid_auc":auc, "valid_acc":acc})
             if auc > best_auc:
                 best_auc = auc
+                best_acc = acc
+                best_preds = preds
                 # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
                 model_to_save = model.module if hasattr(model, 'module') else model
                 save_checkpoint({
@@ -166,6 +186,13 @@ def run_kfold(args, train_data):
                 scheduler.step(best_auc)
             else:
                 scheduler.step()
+        
+        val_auc += best_auc/n_splits
+        val_acc += best_acc/n_splits
+        oof[valid_idx] = best_preds
+
+    
+    print(f'Valid AUC : {val_auc}, Valid ACC : {val_acc} \n')
 
 
 def train(train_loader, model, optimizer, args):
@@ -351,6 +378,8 @@ def get_model(args,model_name:str):
     if model_name == 'lstmattn': model = LSTMATTN(args)
     if model_name == 'bert': model = Bert(args)
     if model_name == 'lstmroberta' : model = LSTMRobertaATTN(args)
+    if model_name == 'lastquery': model = LastQuery(args)
+    if model_name == 'saint': model = Sain(args)
     
 
     model.to(args.device)
@@ -465,3 +494,12 @@ def load_model_kfold(args, fold):
     
     print("Loading Model from:", model_path, "...Finished.")
     return model
+
+
+
+def get_target(datas):
+    targets = []
+    for data in datas:
+        targets.append(data[-1][-1])
+
+    return np.array(targets)
