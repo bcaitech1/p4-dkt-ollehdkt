@@ -1,4 +1,4 @@
-model : lgbm    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint}
+model : lstm    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint}
 
 wandb :
     using: False
@@ -10,7 +10,7 @@ wandb :
         - baseline
 
 ##main params
-task_name: lgbm_test
+task_name: target_check
 seed: 42
 device: cuda
 
@@ -22,14 +22,14 @@ asset_dir: asset/
 model_dir: models/
 output_dir: output/
 
-max_seq_len: 1024
+max_seq_len: 20
 num_workers: 1
 
 ##K-fold params
 use_kfold : True #n개의 fold를 이용하여 k-fold를 진행한다.
 use_stratify : False
-n_fold : 8
-split_by_user : True #k-fold를 수행할 dataset을 user 기준으로 split
+n_fold : 5
+split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
 hidden_dim : 128
@@ -48,7 +48,7 @@ split_ratio : 0.7
 
 #중요
 optimizer : adamW
-scheduler: plateau
+scheduler: linear_warmup
    
    
 #use only in lgbm

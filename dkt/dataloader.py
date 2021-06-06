@@ -144,13 +144,15 @@ class DKTDataset(torch.utils.data.Dataset):
         
 
         cate_cols = [test, question, tag, correct]
-
+        
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
         if seq_len > self.args.max_seq_len:
             for i, col in enumerate(cate_cols):
+                #가장 최근 것부터 적용, 예전 기록들은 지운다
                 cate_cols[i] = col[-self.args.max_seq_len:]
             mask = np.ones(self.args.max_seq_len, dtype=np.int16)
         else:
+            #0으로 패딩
             mask = np.zeros(self.args.max_seq_len, dtype=np.int16)
             mask[-seq_len:] = 1
 
@@ -172,18 +174,22 @@ from torch.nn.utils.rnn import pad_sequence
 def collate(batch):
     col_n = len(batch[0])
     col_list = [[] for _ in range(col_n)]
+    #마스크의 길이로 max_seq_len
     max_seq_len = len(batch[0][-1])
 
         
     # batch의 값들을 각 column끼리 그룹화
     for row in batch:
         for i, col in enumerate(row):
+            #앞부분에 마스킹을 넣어주어 sequential하게 interaction들을 학습하게 한다
             pre_padded = torch.zeros(max_seq_len)
             pre_padded[-len(col):] = col
             col_list[i].append(pre_padded)
 
-
+    
     for i, _ in enumerate(col_list):
+        #stack을 통해 피처 텐서를 이어붙인다(차원축으로) <-> torch.cat
+        #각 배치에서 shape(len(feature),len(max_seq_len)) -> shape(len(feature),1,len(max_seq_len)) 
         col_list[i] =torch.stack(col_list[i])
     
     return tuple(col_list)
@@ -191,7 +197,7 @@ def collate(batch):
 
 def get_loaders(args, train, valid):
 
-    pin_memory = False
+    pin_memory = True
     train_loader, valid_loader = None, None
     
     if train is not None:
