@@ -37,7 +37,7 @@ if __name__ == "__main__":
     # parser.add_argument('-c', '--conf', default='/opt/ml/code/conf.yml', help='wrtie configuration file root.')
     # term_args = parser.parse_args()
 
-    with open('/opt/ml/p4-dkt-ollehdkt/conf.yml') as f:
+    with open('/opt/ml/code/conf.yml') as f:
         cf = yaml.load(f, Loader=yaml.FullLoader)
     args = AttrDict(cf)
     # args = parse_args(mode='train')

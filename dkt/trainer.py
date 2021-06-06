@@ -165,6 +165,7 @@ def run_kfold(args, train_data):
     oof = np.zeros(train_data.shape[0])
 
     for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data, target)):
+        print(f'{fold}fold를 수행합니다')
         trn_data = train_data[train_idx]
         val_data = train_data[valid_idx]
         
