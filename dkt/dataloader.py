@@ -7,10 +7,14 @@ import random
 from sklearn.preprocessing import LabelEncoder
 import numpy as np
 import torch
+
 from .features import Features as fe
 
 n_test_level_diff=10000
 n_unique = 0
+
+from lgbm_utils import *
+
 
 class Preprocess:
     def __init__(self,args):
@@ -25,10 +29,16 @@ class Preprocess:
     def get_test_data(self):
         return self.test_data
 
-    def split_data(self, data, ratio=0.8, shuffle=True, seed=0):
+
+    def split_data(self, data, ratio=0.7, shuffle=True, seed=42):
         """
         split data into two parts with a given ratio.
         """
+        #lgbm일 경우
+        if self.args.model=='lgbm':
+            return lgbm_split_data(data,ratio,seed)
+
+        #lgbm이 아닐 경우
         if shuffle:
             random.seed(seed) # fix to default seed 0
             random.shuffle(data)
@@ -44,10 +54,6 @@ class Preprocess:
         np.save(le_path, encoder.classes_)
 
     def __preprocessing(self, df, is_train = True):
-
-        print(f'__preprocessing df')
-        print(df)
-
         cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
 
         if not os.path.exists(self.args.asset_dir):
@@ -82,34 +88,35 @@ class Preprocess:
 
     def __feature_engineering(self, df):
         #TODO
-        
-        # df = fe.feature_engineering_03(df) # 종호님 피쳐는 먼저 나와야한다.
-        
-        # print(f'{df.columns}')
-        df = fe.feature_engineering_13(df)
-        # df = fe.feature_engineering_07(df)
-        # df = fe.feature_engineering_08(df)
-        # df = fe.feature_engineering_09(df)
-        # df = fe.feature_engineering_10(df)
-        # df = fe.feature_engineering_11(df)
-        # df = fe.feature_engineering_12(df)
+        if self.args.model=='lgbm':
+            return make_lgbm_feature(self.args, df)
+        else:
+            #lgbm 외의 다른 모델들의 fe가 필요하다
+            # df = fe.feature_engineering_03(df) # 종호님 피쳐는 먼저 나와야한다.
+            # print(f'{df.columns}')
+            df = fe.feature_engineering_13(df)
+            # df = fe.feature_engineering_07(df)
+            # df = fe.feature_engineering_08(df)
+            # df = fe.feature_engineering_09(df)
+            # df = fe.feature_engineering_10(df)
+            # df = fe.feature_engineering_11(df)
+            # df = fe.feature_engineering_12(df)
 
-        
-        
-        # df = df.merge(fe.feature_engineering_06(pd.DataFrame(df)), left_index=True,right_index=True, how='left')
-        print(f'fe 시 컬럼 확인 : {df.columns}')
-        print(df.columns)
-        
-        print('dataframe 확인')
-        print(df)
-        
-        drop_cols = ['_',"index","point","answer_min_count","answer_max_count","user_count",'sec_time'] # drop할 칼럼
-        for col in drop_cols:
-            if col in df.columns:
-                df.drop([col],axis=1, inplace=True)
-        print(f"drop 후 : {df.columns}")
+            # df = df.merge(fe.feature_engineering_06(pd.DataFrame(df)), left_index=True,right_index=True, how='left')
+            print(f'fe 시 컬럼 확인 : {df.columns}')
+            print(df.columns)
 
-        return df
+            print('dataframe 확인')
+            print(df)
+
+            drop_cols = ['_',"index","point","answer_min_count","answer_max_count","user_count",'sec_time'] # drop할 칼럼
+            for col in drop_cols:
+                if col in df.columns:
+                    df.drop([col],axis=1, inplace=True)
+            print(f"drop 후 : {df.columns}")
+
+            return df
+        
 
     def load_data_from_file_v2(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
@@ -147,19 +154,22 @@ class Preprocess:
         len(f'group.values->{len(group.values)}')
         return group.values
 
+
     def load_data_from_file(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
-        print(f'csv_file_path : {csv_file_path}')
         df = pd.read_csv(csv_file_path)#, nrows=100000)
+        
+         
+        
+        if self.args.model=='lgbm':
+            #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
+            df.sort_values(by=['userID','Timestamp'], inplace=True)
+            return df
+
         df = self.__feature_engineering(df)
         df = self.__preprocessing(df, is_train)
-
-        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용 
-        self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))
-        self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
-        self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
-        
-        print(f'n_unique : {n_unique}')
+       
+        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용     
 
         # default 태그
         self.args.n_test_level_diff = 2563 # 변별력 고유값 개수 : 2563
@@ -284,46 +294,6 @@ class TestDKTDataset(torch.utils.data.Dataset):
         return len(self.data)
         
 
-class DevDKTDataset(torch.utils.data.Dataset):
-    def __init__(self, data, args):
-        self.data = data
-        self.args = args
-
-    def __getitem__(self, index):
-        row = self.data[index]
-
-        # 각 data의 sequence length
-        seq_len = len(row[0])
-        # print(f'row 값 : {len(row)}')
-        if len(row)==5:
-            test, question, tag, correct, test_level_diff = row[0], row[1], row[2], row[3], row[4]
-            cate_cols = [test, question, tag, correct, test_level_diff]
-        else:
-            test, question, tag, correct = row[0], row[1], row[2], row[3]
-            cate_cols = [test, question, tag, correct]
-        
-
-        # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
-        if seq_len > self.args.max_seq_len:
-            for i, col in enumerate(cate_cols):
-                cate_cols[i] = col[-self.args.max_seq_len:]
-            mask = np.ones(self.args.max_seq_len, dtype=np.int16)
-        else:
-            mask = np.zeros(self.args.max_seq_len, dtype=np.int16)
-            mask[-seq_len:] = 1
-
-        # mask도 columns 목록에 포함시킴
-        cate_cols.append(mask)
-
-        # np.array -> torch.tensor 형변환
-        for i, col in enumerate(cate_cols):
-            cate_cols[i] = torch.tensor(col)
-
-        return cate_cols
-
-    def __len__(self):
-        return len(self.data)
-
 
 class DKTDataset(torch.utils.data.Dataset):
     def __init__(self, data, args):
@@ -344,9 +314,11 @@ class DKTDataset(torch.utils.data.Dataset):
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
         if seq_len > self.args.max_seq_len:
             for i, col in enumerate(cate_cols):
+                #가장 최근 것부터 적용, 예전 기록들은 지운다
                 cate_cols[i] = col[-self.args.max_seq_len:]
             mask = np.ones(self.args.max_seq_len, dtype=np.int16)
         else:
+            #0으로 패딩
             mask = np.zeros(self.args.max_seq_len, dtype=np.int16)
             mask[-seq_len:] = 1
 
@@ -368,18 +340,22 @@ from torch.nn.utils.rnn import pad_sequence
 def collate(batch):
     col_n = len(batch[0])
     col_list = [[] for _ in range(col_n)]
+    #마스크의 길이로 max_seq_len
     max_seq_len = len(batch[0][-1])
 
         
     # batch의 값들을 각 column끼리 그룹화
     for row in batch:
         for i, col in enumerate(row):
+            #앞부분에 마스킹을 넣어주어 sequential하게 interaction들을 학습하게 한다
             pre_padded = torch.zeros(max_seq_len)
             pre_padded[-len(col):] = col
             col_list[i].append(pre_padded)
 
 
     for i, _ in enumerate(col_list):
+        #stack을 통해 피처 텐서를 이어붙인다(차원축으로) <-> torch.cat
+        #각 배치에서 shape(len(feature),len(max_seq_len)) -> shape(len(feature),1,len(max_seq_len)) 
         col_list[i] =torch.stack(col_list[i])
     
     return tuple(col_list)
@@ -466,3 +442,4 @@ def data_augmentation(data, args):
         data = slidding_window(data, args)
 
     return data
+

@@ -6,6 +6,8 @@ import torch.nn.functional as F
 import numpy as np
 import copy
 import math
+import os
+
 from torch.nn.modules import dropout
 
 from torchsummary import summary
@@ -18,6 +20,7 @@ except:
 from transformers.models.convbert.modeling_convbert import ConvBertConfig, ConvBertEncoder,ConvBertModel
 from transformers.models.roberta.modeling_roberta import RobertaConfig,RobertaEncoder,RobertaModel
 from transformers import BertPreTrainedModel
+
 
 import re
 
@@ -67,6 +70,7 @@ class TfixupSaint(nn.Module):
         
         ### Embedding 
         # ENCODER embedding
+
         self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
         self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
         self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
@@ -284,6 +288,7 @@ class Saint(nn.Module):
         
         ### Embedding 
         # ENCODER embedding
+
         self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
         self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
         self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
@@ -452,13 +457,14 @@ class Feed_Forward_block_Post(nn.Module):
 class LastQuery_Post_TEST(nn.Module):
     def __init__(self, args):
         super(LastQuery_Post_TEST, self).__init__()
+
         self.args = args
         self.device = args.device
 
         self.hidden_dim = self.args.hidden_dim
-        
         # Embedding 
         # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
+
         self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
         self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
         self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
@@ -542,6 +548,7 @@ class LastQuery_Post_TEST(nn.Module):
             self.args.n_layers,
             batch_size,
             self.args.hidden_dim)
+
         c = c.to(self.device)
 
         return (h, c)
@@ -568,6 +575,14 @@ class LastQuery_Post_TEST(nn.Module):
         seq_len = interaction.size(1)
 
         # 신나는 embedding
+
+    def forward(self, input):
+
+        test, question, tag, _, mask, interaction, _ = input
+
+        batch_size = interaction.size(0)
+
+        # Embedding
         embed_interaction = self.embedding_interaction(interaction)
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
@@ -651,6 +666,7 @@ class LastQuery_Post(nn.Module):
         
         # Embedding 
         # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
+
         self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
         self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
         self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
@@ -695,7 +711,6 @@ class LastQuery_Post(nn.Module):
         self.fc = nn.Linear(self.hidden_dim, 1)
        
         self.activation = nn.Sigmoid()
-
 
     def get_mask(self, seq_len, index, batch_size):
         """
@@ -756,11 +771,13 @@ class LastQuery_Post(nn.Module):
 
         index = input[len(input)-1]
 
+
         batch_size = interaction.size(0)
         seq_len = interaction.size(1)
 
         # 신나는 embedding
         embed_interaction = self.embedding_interaction(interaction)
+
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
         embed_tag = self.embedding_tag(tag)
@@ -826,6 +843,7 @@ class LastQuery_Post(nn.Module):
         out, hidden = self.lstm(out, hidden)
 
         ###################### DNN #####################
+
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
         out = self.fc(out)
 
@@ -835,6 +853,7 @@ class LastQuery_Post(nn.Module):
 
 ##### PrePadding
 class Feed_Forward_block_Pre(nn.Module):
+
     """
     out =  Relu( M_out*w1 + b1) *w2 + b2
     """
@@ -849,6 +868,7 @@ class Feed_Forward_block_Pre(nn.Module):
 class LastQuery_Pre(nn.Module):
     def __init__(self, args):
         super(LastQuery_Pre, self).__init__()
+
         self.args = args
         self.device = args.device
 
@@ -861,6 +881,7 @@ class LastQuery_Pre(nn.Module):
         self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
         self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
         self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim)
+
 
         # 기존 keetar님 솔루션에서는 Positional Embedding은 사용되지 않습니다
         # 하지만 사용 여부는 자유롭게 결정해주세요 :)
@@ -883,6 +904,7 @@ class LastQuery_Pre(nn.Module):
         self.attn = nn.MultiheadAttention(embed_dim=self.hidden_dim, num_heads=self.args.n_heads)
         self.mask = None # last query에서는 필요가 없지만 수정을 고려하여서 넣어둠
         self.ffn = Feed_Forward_block_Pre(self.hidden_dim)      
+
 
         self.ln1 = nn.LayerNorm(self.hidden_dim)
         self.ln2 = nn.LayerNorm(self.hidden_dim)
@@ -935,13 +957,11 @@ class LastQuery_Pre(nn.Module):
         batch_size = interaction.size(0)
         seq_len = interaction.size(1)
 
-        
         # 신나는 embedding
         embed_interaction = self.embedding_interaction(interaction)
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
         embed_tag = self.embedding_tag(tag)
-
 
         # dev
         embed_other_features =[] 
@@ -1001,7 +1021,6 @@ class LastQuery_Pre(nn.Module):
         out = self.fc(out)
 
         preds = self.activation(out).view(batch_size, -1)
-
         # print(preds)
 
         return preds
