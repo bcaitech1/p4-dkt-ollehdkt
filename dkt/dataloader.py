@@ -94,7 +94,7 @@ class Preprocess:
             #lgbm 외의 다른 모델들의 fe가 필요하다
             # df = fe.feature_engineering_03(df) # 종호님 피쳐는 먼저 나와야한다.
             # print(f'{df.columns}')
-            df = fe.feature_engineering_13(df)
+            # df = fe.feature_engineering_13(df)
             # df = fe.feature_engineering_07(df)
             # df = fe.feature_engineering_08(df)
             # df = fe.feature_engineering_09(df)

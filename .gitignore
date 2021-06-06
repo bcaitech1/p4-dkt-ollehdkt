@@ -2,6 +2,8 @@
 models
 output
 wandb
+src
+output
 
 #add when u clone this file
 conf.yml

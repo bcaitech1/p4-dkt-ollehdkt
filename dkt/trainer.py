@@ -174,7 +174,7 @@ def run_kfold(args, train_data):
         args.total_steps = int(len(train_loader.dataset) / args.batch_size) * (args.n_epochs)
         args.warmup_steps = args.total_steps // 10
                 
-        model = get_model(args,args.model)
+        model = get_model(args)
         optimizer = get_optimizer(model, args)
         scheduler = get_scheduler(optimizer, args)
 
@@ -244,13 +244,10 @@ def train(train_loader, model, optimizer, args):
         # input = process_batch(batch, args)
         # input = process_batch_test(batch, args)
         if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
-            or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint):
+            or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint) or isinstance(model,LSTM) or isinstance(model, AutoEncoderLSTMATTN):
             input = process_batch_v2(batch, args)
-        elif isinstance(model,TestLSTMConvATTN):
-            
-            input = process_batch_test(batch,args)
         else:
-            input = process_batch_test(batch,args)
+            input = process_batch(batch,args)
         # print(f"input 텐서 사이즈 : {type(input)}, {len(input)}")
         preds = model(input)
         targets = input[3] # correct
@@ -296,11 +293,8 @@ def validate(valid_loader, model, args):
     for step, batch in enumerate(valid_loader):
         # input = process_batch(batch, args)
         if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
-            or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint):
+            or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint) or isinstance(model, AutoEncoderLSTMATTN):
             input = process_batch_v2(batch, args)
-        elif isinstance(model,TestLSTMConvATTN):
-            
-            input = process_batch_test(batch,args)
         else:
             input = process_batch(batch,args)
 
@@ -433,20 +427,18 @@ def get_model(args):
     Load model and move tensors to a given devices.
     """
     if args.model.lower() == 'lstm': model = LSTM(args)
-    if args.model.lower() == 'lstmattn': model = LSTMATTN(args)
+    # if args.model.lower() == 'lstmattn': model = LSTMATTN(args)
     if args.model.lower() == 'bert': model = Bert(args)
     if args.model.lower() == 'bilstmattn': model = BiLSTMATTN(args)
-    if args.model.lower() == 'lstmconvattn' : model = LSTMConvATTN(args)
-    if args.model.lower() == 'lstmrobertaattn': model = LSTMRobertaATTN(args)
-    if args.model.lower() == 'devlstmconvattn' : model = DevLSTMConvATTN(args)
-    if args.model.lower() == 'testlstmconvattn' : 
-        model = TestLSTMConvATTN(args)
+    if args.model.lower() == 'lstmconvattn' or args.model.lower() == 'lstmrobertaattn' or args.model.lower() == 'lstmattn'\
+       or args.model.lower() == 'lstmalbertattn': 
+        model = AutoEncoderLSTMATTN(args)
     if args.model.lower() == 'mylstmconvattn' : model = MyLSTMConvATTN(args)
     if args.model.lower() == 'saint' : model = Saint(args)
     if args.model.lower() == 'lastquery_post': model = LastQuery_Post(args)
     if args.model.lower() == 'lastquery_pre' : model = LastQuery_Pre(args)
-    if args.model.lower() == 'lastquery_post_test' : model = LastQuery_Post_TEST(args)
-    if args.model.lower() == 'tfixsaint' : model = TfixupSaint(args)
+    if args.model.lower() == 'lastquery_post_test' : model = LastQuery_Post_TEST(args) # 개발중(deprecated)
+    if args.model.lower() == 'tfixsaint' : model = TfixupSaint(args) # tfix-up을 적용한 Saint
 
     model.to(args.device)
 
@@ -584,7 +576,7 @@ def process_batch_test(batch, args):
     return (test, question,
     tag, correct, mask, interaction, test_level_diff,tag_mean,tag_sum,ans_rate, gather_index)
 
-# 배치 전처리
+# 배치 전처리(기본 feature만 쓸 때, baseline)
 def process_batch(batch, args):
     if len(batch)==6:
         test, question, tag, correct, test_level_diff, mask = batch
@@ -682,7 +674,7 @@ def load_model_kfold(args, fold):
     model_path = os.path.join((args.model_dir + args.task_name), f'{args.task_name}_{fold+1}fold.pt')
     print("Loading Model from:", model_path)
     load_state = torch.load(model_path)
-    model = get_model(args, args.model)
+    model = get_model(args)
 
     # 1. load model state
     model.load_state_dict(load_state['state_dict'], strict=True)
@@ -701,7 +693,7 @@ def load_model(args):
     model_path = os.path.join(args.model_dir, f'{args.task_name}.pt')
     print("Loading Model from:", model_path)
     load_state = torch.load(model_path)
-    model = get_model(args, args.model)
+    model = get_model(args)
 
     # 1. load model state
     model.load_state_dict(load_state['state_dict'], strict=True)
