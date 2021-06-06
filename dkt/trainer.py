@@ -1,16 +1,21 @@
 import os
-import json
+from numpy.lib.arraysetops import isin
 import torch
 import numpy as np
-
+import json
+import gc
 from tqdm.auto import tqdm
+
 from .dataloader import get_loaders
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .criterion import get_criterion
 from .metric import get_metric
+import wandb
+
 from .model import *
 from lgbm_utils import *
+from .new_model import Bert,LSTMATTN
 
 import lightgbm as lgb
 from sklearn.metrics import roc_auc_score
@@ -48,7 +53,8 @@ def run(args, train_data, valid_data):
     args.total_steps = int(len(train_loader.dataset) / args.batch_size) * (args.n_epochs)
     args.warmup_steps = args.total_steps // 10
             
-    model = get_model(args,args.model)
+    model = get_model(args)
+#     model = get_model(args,args.model)
     optimizer = get_optimizer(model, args)
     scheduler = get_scheduler(optimizer, args)
 
@@ -76,6 +82,7 @@ def run(args, train_data, valid_data):
                 'epoch': epoch + 1,
                 'state_dict': model_to_save.state_dict(),
                 },
+
                 args.model_dir, f'{args.task_name}.pt',
             )
             early_stopping_counter = 0
@@ -90,7 +97,6 @@ def run(args, train_data, valid_data):
             scheduler.step(best_auc)
         else:
             scheduler.step()
-
 
 def run_kfold(args, train_data):
     n_splits = args.n_fold
@@ -227,12 +233,25 @@ def run_kfold(args, train_data):
 
 def train(train_loader, model, optimizer, args):
     model.train()
-    print("start training--------------------------")
+
     total_preds = []
     total_targets = []
     losses = []
-    for step, batch in tqdm(enumerate(train_loader)):
-        input = process_batch(batch, args)
+
+    for step, batch in enumerate(train_loader):
+        gc.collect()
+        # print(len(batch))
+        # input = process_batch(batch, args)
+        # input = process_batch_test(batch, args)
+        if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
+            or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint):
+            input = process_batch_v2(batch, args)
+        elif isinstance(model,TestLSTMConvATTN):
+            
+            input = process_batch_test(batch,args)
+        else:
+            input = process_batch_test(batch,args)
+        # print(f"input 텐서 사이즈 : {type(input)}, {len(input)}")
         preds = model(input)
         targets = input[3] # correct
 
@@ -275,7 +294,16 @@ def validate(valid_loader, model, args):
     total_preds = []
     total_targets = []
     for step, batch in enumerate(valid_loader):
-        input = process_batch(batch, args)
+        # input = process_batch(batch, args)
+        if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
+            or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint):
+            input = process_batch_v2(batch, args)
+        elif isinstance(model,TestLSTMConvATTN):
+            
+            input = process_batch_test(batch,args)
+        else:
+            input = process_batch(batch,args)
+
 
         preds = model(input)
         targets = input[3] # correct
@@ -318,9 +346,11 @@ def inference(args, test_data):
     
     
     total_preds = []
-    
-    for step, batch in tqdm(enumerate(test_loader)):
-        input = process_batch(batch, args)
+
+    for step, batch in enumerate(test_loader):
+        # input = process_batch(batch, args)
+        # input = process_batch_test(batch,args)
+        input = process_batch_v2(batch,args)
 
         preds = model(input)
         
@@ -335,18 +365,17 @@ def inference(args, test_data):
             preds = preds.detach().numpy()
             
         total_preds+=list(preds)
-    
+
     new_output_path=f'{args.output_dir}{args.task_name}'
     write_path = os.path.join(new_output_path, "output.csv")
     if not os.path.exists(new_output_path):
         os.makedirs(new_output_path)    
+
     with open(write_path, 'w', encoding='utf8') as w:
         print("writing prediction : {}".format(write_path))
         w.write("id,prediction\n")
         for id, p in enumerate(total_preds):
             w.write('{},{}\n'.format(id,p))
-
-
 
 def inference_kfold(args, test_data):
     if args.model=='lgbm':
@@ -399,42 +428,119 @@ def inference_kfold(args, test_data):
             w.write('{},{}\n'.format(id,p))
 
 
-
-def get_model(args,model_name:str):
+def get_model(args):
     """
     Load model and move tensors to a given devices.
     """
-    if model_name == 'lstm': model = LSTM(args)
-    if model_name == 'lstmattn': model = LSTMATTN(args)
-    if model_name == 'bert': model = Bert(args)
-    if model_name == 'lstmroberta' : model = LSTMRobertaATTN(args)
-    if model_name == 'lastquery': model = LastQuery(args)
-    if model_name == 'saint': model = Sain(args)
-    
+    if args.model.lower() == 'lstm': model = LSTM(args)
+    if args.model.lower() == 'lstmattn': model = LSTMATTN(args)
+    if args.model.lower() == 'bert': model = Bert(args)
+    if args.model.lower() == 'bilstmattn': model = BiLSTMATTN(args)
+    if args.model.lower() == 'lstmconvattn' : model = LSTMConvATTN(args)
+    if args.model.lower() == 'lstmrobertaattn': model = LSTMRobertaATTN(args)
+    if args.model.lower() == 'devlstmconvattn' : model = DevLSTMConvATTN(args)
+    if args.model.lower() == 'testlstmconvattn' : 
+        model = TestLSTMConvATTN(args)
+    if args.model.lower() == 'mylstmconvattn' : model = MyLSTMConvATTN(args)
+    if args.model.lower() == 'saint' : model = Saint(args)
+    if args.model.lower() == 'lastquery_post': model = LastQuery_Post(args)
+    if args.model.lower() == 'lastquery_pre' : model = LastQuery_Pre(args)
+    if args.model.lower() == 'lastquery_post_test' : model = LastQuery_Post_TEST(args)
+    if args.model.lower() == 'tfixsaint' : model = TfixupSaint(args)
 
     model.to(args.device)
 
     return model
 
-
-# 배치 전처리
-def process_batch(batch, args):
-    test, question, tag, correct, mask = batch
-    
-
+# 배치 전처리 일반화
+def process_batch_v2(batch, args):
+    # batch : load_data_from 에서 return 시킬 feature(컬럼)
+    # test, question,tag,correct, test_level_diff, tag_mean,tag_sum,ans_rate,mask = batch
+    # 규칙 : mask는 항상 맨 뒤임
+    # print(type(batch))
+    # print(batch)
+    test = batch[0]
+    question = batch[1]
+    tag = batch[2]
+    correct = batch[3]
+    mask = batch[len(batch)-1]
     # change to float
     mask = mask.type(torch.FloatTensor)
     correct = correct.type(torch.FloatTensor)
-
-    """
-    interaction에서 rolling의 이유
-    - 이전 time_step에서 푼 문제를 맞췄는지 틀렸는지를 현재 time step의 input으로 넣기 위해서 rolling을 사용한다.
-    """
 
     #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     #    saint의 경우 decoder에 들어가는 input이다
     interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
     interaction = interaction.roll(shifts=1, dims=1)
+    # interaction[:, 0] = 0 # set padding index to the first sequence
+    interaction_mask = mask.roll(shifts=1, dims=1)
+    interaction_mask[:, 0] = 0
+    interaction = (interaction * interaction_mask).to(torch.int64)
+    
+    #  test_id, question_id, tag
+    test = ((test + 1) * mask).to(torch.int64)
+    question = ((question + 1) * mask).to(torch.int64)
+    tag = ((tag + 1) * mask).to(torch.int64)
+
+    new_batch = [None for i in range((len(batch)-5))]
+    # 기타 features
+    for i in range(4,len(batch)-1):
+        new_batch[i-4] = ((batch[i]+1)*mask).to(torch.int64)
+
+    # gather index
+    # 마지막 sequence만 사용하기 위한 index
+    gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
+    gather_index = gather_index.view(-1, 1) - 1
+
+    # device memory로 이동
+    m=0
+    test = test.to(args.device)
+    m=max(torch.max(test),m)
+    question = question.to(args.device)
+    m=max(torch.max(question),m)
+
+    tag = tag.to(args.device)
+    m=max(torch.max(tag),m)
+    correct = correct.to(args.device)
+    m=max(torch.max(correct),m)
+    mask = mask.to(args.device)
+    m=max(torch.max(mask),m)
+
+    interaction = interaction.to(args.device)
+    m=max(torch.max(interaction),m)
+    gather_index = gather_index.to(args.device)
+
+    # 기타 feature를 args의 device에 load
+    for i in range(len(new_batch)):
+        new_batch[i] = new_batch[i].to(args.device)
+        m=max(torch.max(new_batch[i]),m)
+
+    ret = [test,question,tag,correct,mask,interaction]
+    ret.extend(new_batch)
+    ret.append(gather_index)
+    # print(f"최댓값 : {m}")
+    return tuple(ret)
+
+# 배치 전처리 테스트
+def process_batch_test(batch, args):
+    # if len(batch)==6:
+    #     test, question, tag, correct, test_level_diff, mask = batch
+    # else:
+    #     test, question, tag, correct, mask = batch
+    test, question,tag,correct, test_level_diff, tag_mean,tag_sum,ans_rate,mask = batch
+    # test, question, tag, correct, mask = batch # base
+    
+    # print(type(batch))
+    
+    # change to float
+    mask = mask.type(torch.FloatTensor)
+    correct = correct.type(torch.FloatTensor)
+
+    #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
+    #    saint의 경우 decoder에 들어가는 input이다
+    interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
+    interaction = interaction.roll(shifts=1, dims=1)
+    # interaction[:, 0] = 0 # set padding index to the first sequence
     interaction_mask = mask.roll(shifts=1, dims=1)
     interaction_mask[:, 0] = 0
     interaction = (interaction * interaction_mask).to(torch.int64)
@@ -444,6 +550,12 @@ def process_batch(batch, args):
     test = ((test + 1) * mask).to(torch.int64)
     question = ((question + 1) * mask).to(torch.int64)
     tag = ((tag + 1) * mask).to(torch.int64)
+    
+    test_level_diff = ((test_level_diff+1) * mask).to(torch.int64)
+
+    tag_mean = ((tag_mean+1) * mask).to(torch.int64)
+    tag_sum = ((tag_sum+1) * mask).to(torch.int64)
+    ans_rate = ((ans_rate+1) * mask).to(torch.int64)
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
@@ -464,9 +576,78 @@ def process_batch(batch, args):
     interaction = interaction.to(args.device)
     gather_index = gather_index.to(args.device)
 
+    test_level_diff = test_level_diff.to(args.device)
+    tag_mean = tag_mean.to(args.device)
+    tag_sum = tag_sum.to(args.device)
+    ans_rate = ans_rate.to(args.device)
+
     return (test, question,
+    tag, correct, mask, interaction, test_level_diff,tag_mean,tag_sum,ans_rate, gather_index)
+
+# 배치 전처리
+def process_batch(batch, args):
+    if len(batch)==6:
+        test, question, tag, correct, test_level_diff, mask = batch
+    else:
+        test, question, tag, correct, mask = batch
+    # test, question, tag, correct, mask = batch # base
+    # print(type(batch))
+    # change to float
+    mask = mask.type(torch.FloatTensor)
+    correct = correct.type(torch.FloatTensor)
+
+    """
+    interaction에서 rolling의 이유
+    - 이전 time_step에서 푼 문제를 맞췄는지 틀렸는지를 현재 time step의 input으로 넣기 위해서 rolling을 사용한다.
+    """
+    #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
+    #    saint의 경우 decoder에 들어가는 input이다
+    interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
+    interaction = interaction.roll(shifts=1, dims=1)
+    interaction_mask = mask.roll(shifts=1, dims=1)
+    interaction_mask[:, 0] = 0
+    interaction = (interaction * interaction_mask).to(torch.int64)
+    # print(interaction)
+    # exit()
+    #  test_id, question_id, tag
+    test = ((test + 1) * mask).to(torch.int64)
+    question = ((question + 1) * mask).to(torch.int64)
+    tag = ((tag + 1) * mask).to(torch.int64)
+    if len(batch)==6: # train시
+        test_level_diff = ((test_level_diff+1) * mask).to(torch.int64)
+
+
+    # gather index
+    # 마지막 sequence만 사용하기 위한 index
+    gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
+    gather_index = gather_index.view(-1, 1) - 1
+
+
+    # device memory로 이동
+
+    test = test.to(args.device)
+    question = question.to(args.device)
+
+
+    tag = tag.to(args.device)
+    correct = correct.to(args.device)
+    mask = mask.to(args.device)
+
+    interaction = interaction.to(args.device)
+    gather_index = gather_index.to(args.device)
+
+    # dev
+    if len(batch)!=6:
+        
+        return (test, question,
             tag, correct, mask,
             interaction, gather_index)
+    test_level_diff = test_level_diff.to(args.device)
+    # return (test, question,
+    #         tag, correct, mask,
+    #         interaction, gather_index) # base
+    return (test, question,
+    tag, correct, mask, interaction, test_level_diff, gather_index)
 
 
 # loss계산하고 parameter update!
@@ -497,22 +678,6 @@ def save_checkpoint(state, model_dir, model_filename):
         os.makedirs(model_dir)    
     torch.save(state, os.path.join(model_dir, model_filename))
 
-
-
-def load_model(args):
-    model_path = os.path.join(args.model_dir, f'{args.task_name}.pt')
-    print("Loading Model from:", model_path)
-    load_state = torch.load(model_path)
-    model = get_model(args, args.model)
-
-    # 1. load model state
-    model.load_state_dict(load_state['state_dict'], strict=True)
-    
-    print("Loading Model from:", model_path, "...Finished.")
-    return model
-
-
-
 def load_model_kfold(args, fold):
     model_path = os.path.join((args.model_dir + args.task_name), f'{args.task_name}_{fold+1}fold.pt')
     print("Loading Model from:", model_path)
@@ -525,11 +690,21 @@ def load_model_kfold(args, fold):
     print("Loading Model from:", model_path, "...Finished.")
     return model
 
-
-
 def get_target(datas):
     targets = []
     for data in datas:
         targets.append(data[-1][-1])
 
     return np.array(targets)
+
+def load_model(args):
+    model_path = os.path.join(args.model_dir, f'{args.task_name}.pt')
+    print("Loading Model from:", model_path)
+    load_state = torch.load(model_path)
+    model = get_model(args, args.model)
+
+    # 1. load model state
+    model.load_state_dict(load_state['state_dict'], strict=True)
+    
+    print("Loading Model from:", model_path, "...Finished.")
+    return model

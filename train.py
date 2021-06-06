@@ -1,15 +1,14 @@
 import os
+from args import parse_args
+from dkt.dataloader import Preprocess
+from dkt import trainer
+import torch
+from dkt.utils import setSeeds
+import wandb
 import yaml
 import json
 import argparse
 from attrdict import AttrDict
-
-from dkt.dataloader import Preprocess
-from dkt import trainer
-from dkt.utils import setSeeds
-
-import torch
-import wandb
 
 
 def main(args):

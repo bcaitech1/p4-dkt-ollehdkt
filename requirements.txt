@@ -3,5 +3,8 @@ pandas
 sklearn
 tqdm
 wandb
-transformers
+transformers==4.4.1
 easydict
+seaborn
+matplotlib
+missingno
