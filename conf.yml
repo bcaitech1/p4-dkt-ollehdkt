@@ -30,7 +30,7 @@ max_seq_len: 20
 num_workers: 1
 
 ##K-fold params
-use_kfold : False #n개의 fold를 이용하여 k-fold를 진행한다.
+use_kfold : True #n개의 fold를 이용하여 k-fold를 진행한다.
 use_stratify : False
 n_fold : 5
 split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
