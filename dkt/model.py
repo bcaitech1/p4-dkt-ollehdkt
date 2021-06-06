@@ -41,6 +41,143 @@ class CFG:
     seq_len=32
     target_size=3
 
+class TestLSTMConvATTN(nn.Module):
+    def __init__(self, args):
+        super(TestLSTMConvATTN, self).__init__()
+        self.args = args
+        self.device = args.device
+
+        self.hidden_dim = self.args.hidden_dim
+        self.n_layers = self.args.n_layers
+        self.n_heads = self.args.n_heads
+        self.drop_out = self.args.drop_out
+
+        #dev
+        self.n_other_features = self.args.n_other_features
+        print(self.n_other_features)
+
+        # Embedding 
+        # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
+        self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
+        self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
+        self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
+        self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
+        # other feature
+        self.f_cnt = len(self.n_other_features) # feature의 개수
+        # self.comb_proj = nn.Linear((self.hidden_dim//3)*(4+self.f_cnt), self.hidden_dim)
+
+        self.comb_proj = nn.Sequential(
+                                    nn.Linear((self.hidden_dim//3)*(4), self.hidden_dim),
+                                    nn.LayerNorm(self.hidden_dim)
+                            )
+
+        self.lstm = nn.LSTM(self.hidden_dim,
+                            self.hidden_dim,
+                            self.n_layers,
+                            batch_first=True)
+        # self.embedding_test = nn.Embedding(100,self.hidden_dim//3)
+
+        # 연속형 임베딩
+        self.embedding_other_cont = nn.Sequential(
+            nn.Linear(self.f_cnt*self.args.max_seq_len,self.hidden_dim//3),
+            nn.LayerNorm(self.hidden_dim//3)
+        )
+
+        self.config = ConvBertConfig( 
+            3, # not used
+            hidden_size=self.hidden_dim,
+            num_hidden_layers=1,
+            num_attention_heads=self.n_heads,
+            intermediate_size=self.hidden_dim,
+            hidden_dropout_prob=self.drop_out,
+            attention_probs_dropout_prob=self.drop_out,
+        )
+        self.attn = ConvBertEncoder(self.config)
+    
+        # Fully connected layer
+        self.fc = nn.Linear(self.hidden_dim, 1)
+
+        self.activation = nn.Sigmoid()
+
+    def init_hidden(self, batch_size):
+        h = torch.zeros(
+            self.n_layers,
+            batch_size,
+            self.hidden_dim)
+        h = h.to(self.device)
+
+        c = torch.zeros(
+            self.n_layers,
+            batch_size,
+            self.hidden_dim)
+        c = c.to(self.device)
+
+        return (h, c)
+
+    def forward(self, input):
+        # print(f'input 길이 : {len(input)}')
+        
+        # input의 순서는 test, question, tag, _, mask, interaction, (...other features), gather_index(안 씀)
+
+        # for i,e in enumerate(input):
+        #     print(f'i 번째 : {e[i].shape}')
+        test = input[0] # [64,24]
+        question = input[1]
+        tag = input[2]
+
+        mask = input[4]
+        interaction = input[5]
+        
+        other_features = [input[i] for i in range(6,len(input)-1)]
+
+        batch_size = interaction.size(0)
+        
+        # Embedding
+        print(f'interaction_embedding shape : {self.embedding_interaction(interaction).shape}')
+        embed_interaction = self.embedding_interaction(interaction)
+        embed_test = self.embedding_test(test)
+        embed_question = self.embedding_question(question)
+        embed_tag = self.embedding_tag(tag)
+        print(f'interaction_embed_after : {embed_interaction.shape}')
+        # dev
+        other_features = [input[i] for i in range(6,len(input)-1)]
+        embed_others = self.embedding_other_cont(other_features[0])
+        cat_list = [embed_interaction,
+                           embed_test,
+                           embed_question,
+                           embed_tag,
+                           ]
+        
+        embed = torch.cat(cat_list, 1)
+        print(f'embed : {embed.shape}')
+        embed = embed.view(batch_size, self.args.max_seq_len*4, -1)
+        print(f'embed : {embed.shape}')
+        X = self.comb_proj(embed)
+        print(f'X_shape : {X.shape}') # [64,96,42] [64,24]
+        print(f'embed_others.shape : {embed_others.shape}')
+        X = torch.cat([X,embed_others],2)
+
+        hidden = self.init_hidden(batch_size)
+        # print(f'{hidden[0].shape}, {hidden[1].shape}')
+        out, hidden = self.lstm(X, hidden)
+        # print(out.shape)
+        out = out.contiguous().view(batch_size, -1, self.hidden_dim)
+        # print(out.shape)
+
+        extended_attention_mask = mask.unsqueeze(1).unsqueeze(2)
+        extended_attention_mask = extended_attention_mask.to(dtype=torch.float32)
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        head_mask = [None] * self.n_layers
+        
+        encoded_layers = self.attn(out, extended_attention_mask, head_mask=head_mask)        
+        sequence_output = encoded_layers[-1]
+        
+        out = self.fc(sequence_output)
+
+        preds = self.activation(out).view(batch_size, -1)
+
+        return preds
+
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=1000):
         super(PositionalEncoding, self).__init__()

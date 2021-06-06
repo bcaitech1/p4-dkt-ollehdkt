@@ -100,10 +100,10 @@ def run(args, train_data, valid_data):
 
 def run_kfold(args, train_data):
     n_splits = args.n_fold
-
+    print("k-fold를 사용합니다","-"*80)
     ### LGBM runner
     if args.model=='lgbm':
-        print("k-fold를 사용합니다","-"*80)
+        
         csv_file_path = os.path.join(args.data_dir, args.file_name)
         train_df = pd.read_csv(csv_file_path)#, nrows=100000)
         
