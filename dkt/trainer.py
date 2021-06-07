@@ -246,7 +246,12 @@ def train(train_loader, model, optimizer, args):
         # input = process_batch_test(batch, args)
         if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
             or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint) or isinstance(model,LSTM) or isinstance(model, AutoEncoderLSTMATTN):
+            # print('process_batch_v2 사용')
+            # input = process_batch_v3(batch, args)
             input = process_batch_v2(batch, args)
+        elif isinstance(model,TestLSTMConvATTN):
+            # print('process_batch_v3 사용')
+            input = process_batch_v3(batch,args)
         else:
             input = process_batch(batch,args)
         # print(f"input 텐서 사이즈 : {type(input)}, {len(input)}")
@@ -296,6 +301,10 @@ def validate(valid_loader, model, args):
         if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
             or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint) or isinstance(model, AutoEncoderLSTMATTN):
             input = process_batch_v2(batch, args)
+            # input = process_batch_v3(batch, args)
+        elif isinstance(model,TestLSTMConvATTN):
+            # print('process_batch_v3 사용 for validate')
+            input = process_batch_v3(batch, args)
         else:
             input = process_batch(batch,args)
 
@@ -345,7 +354,10 @@ def inference(args, test_data):
     for step, batch in enumerate(test_loader):
         # input = process_batch(batch, args)
         # input = process_batch_test(batch,args)
-        input = process_batch_v2(batch,args)
+        if isinstance(model,TestLSTMConvATTN):
+            input = process_batch_v3(batch,args)
+        else:
+            input = process_batch_v2(batch,args)
 
         preds = model(input)
         
@@ -440,10 +452,85 @@ def get_model(args):
     if args.model.lower() == 'lastquery_pre' : model = LastQuery_Pre(args)
     if args.model.lower() == 'lastquery_post_test' : model = LastQuery_Post_TEST(args) # 개발중(deprecated)
     if args.model.lower() == 'tfixsaint' : model = TfixupSaint(args) # tfix-up을 적용한 Saint
+    if args.model.lower() == 'testlstmconvattn' : model = TestLSTMConvATTN(args)
 
     model.to(args.device)
 
     return model
+
+def process_batch_v3(batch,args):
+
+    # type -> 1: 범주형
+
+    # batch : load_data_from 에서 return 시킬 feature(컬럼)
+    # test, question,tag,correct, test_level_diff, tag_mean,tag_sum,ans_rate,mask = batch
+    # 규칙 : mask는 항상 맨 뒤임
+    # print(type(batch))
+    # print(batch)
+    test = batch[0]
+    question = batch[1]
+    tag = batch[2]
+    correct = batch[3]
+    mask = batch[len(batch)-1]
+    # change to float
+    mask = mask.type(torch.FloatTensor)
+    correct = correct.type(torch.FloatTensor)
+
+    #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
+    #    saint의 경우 decoder에 들어가는 input이다
+    interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
+    interaction = interaction.roll(shifts=1, dims=1)
+    # interaction[:, 0] = 0 # set padding index to the first sequence
+    interaction_mask = mask.roll(shifts=1, dims=1)
+    interaction_mask[:, 0] = 0
+    interaction = (interaction * interaction_mask).to(torch.int64)
+    
+    #  test_id, question_id, tag
+    test = ((test + 1) * mask).to(torch.int64)
+    question = ((question + 1) * mask).to(torch.int64)
+    tag = ((tag + 1) * mask).to(torch.int64)
+
+    new_batch = [None for i in range((len(batch)-5))]
+    # 기타 features
+    # for i in range(4,len(batch)-1):
+    #     new_batch[i-4] = ((batch[i]+1)*mask).to(torch.int64)
+
+    for i in range(4,len(batch)-1):
+        new_batch[i-4] = batch[i]
+
+    # gather index
+    # 마지막 sequence만 사용하기 위한 index
+    gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
+    gather_index = gather_index.view(-1, 1) - 1
+
+    # device memory로 이동
+    m=0
+    test = test.to(args.device)
+    m=max(torch.max(test),m)
+    question = question.to(args.device)
+    m=max(torch.max(question),m)
+
+    tag = tag.to(args.device)
+    m=max(torch.max(tag),m)
+    correct = correct.to(args.device)
+    m=max(torch.max(correct),m)
+    mask = mask.to(args.device)
+    m=max(torch.max(mask),m)
+
+    interaction = interaction.to(args.device)
+    m=max(torch.max(interaction),m)
+    gather_index = gather_index.to(args.device)
+
+    # 기타 feature를 args의 device에 load
+    for i in range(len(new_batch)):
+        new_batch[i] = new_batch[i].to(args.device)
+        m=max(torch.max(new_batch[i]),m)
+
+    ret = [test,question,tag,correct,mask,interaction]
+    ret.extend(new_batch)
+    ret.append(gather_index)
+    # print(f"최댓값 : {m}")
+    return tuple(ret)
 
 # 배치 전처리 일반화
 def process_batch_v2(batch, args):

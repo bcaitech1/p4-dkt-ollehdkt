@@ -20,13 +20,15 @@ device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
 file_name: train_data.csv
+# file_name : time_train.csv
 test_file_name: test_data.csv
+# test_file_name : time_test.csv
 
 asset_dir: asset/
 model_dir: models/
 output_dir: output/
 
-max_seq_len: 20
+max_seq_len: 24
 num_workers: 1
 
 ##K-fold params
@@ -37,7 +39,7 @@ split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
 hidden_dim : 128
-n_layers : 4
+n_layers : 2
 n_heads : 2
 drop_out: 0.2
 
