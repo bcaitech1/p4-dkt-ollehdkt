@@ -1668,7 +1668,7 @@ class LSTMATTN(nn.Module):
         self.n_layers = self.args.n_layers
         self.n_heads = self.args.n_heads
         self.drop_out = self.args.drop_out
-
+        self.cont_cols=1
         # Embedding 
         # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
         self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
@@ -1676,8 +1676,17 @@ class LSTMATTN(nn.Module):
         self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
         self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
 
+        #continuous
+        self.cont_proj=nn.Sequential(                
+            nn.Linear(self.cont_cols, self.hidden_dim//2),
+            nn.LayerNorm(self.hidden_dim//2),
+        )
+
         # embedding combination projection
-        self.comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim)
+        self.comb_proj = nn.Sequential(                
+            nn.Linear((self.hidden_dim//3)*4, self.hidden_dim//2),
+            nn.LayerNorm(self.hidden_dim//2),
+        )
 
         self.lstm = nn.LSTM(self.hidden_dim,
                             self.hidden_dim,
@@ -1717,17 +1726,18 @@ class LSTMATTN(nn.Module):
 
     def forward(self, input):
 
-        test, question, tag, _, mask, interaction, _ = input
-        
+        test, question,tag, correct, mask, interaction, solve_time, gather_index=input
+
         batch_size = interaction.size(0)
 
         # Embedding
-
+        solve_time=solve_time.unsqueeze(-1)
         embed_interaction = self.embedding_interaction(interaction)
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
         embed_tag = self.embedding_tag(tag)
         
+        embed_cont=self.cont_proj(solve_time)
 
         embed = torch.cat([embed_interaction,
                            embed_test,
@@ -1735,6 +1745,7 @@ class LSTMATTN(nn.Module):
                            embed_tag,], 2)
 
         X = self.comb_proj(embed)
+        X=torch.cat([X, embed_cont], 2)
 
         hidden = self.init_hidden(batch_size)
         # print(f'{hidden[0].shape}, {hidden[1].shape}')
