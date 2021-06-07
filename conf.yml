@@ -1,4 +1,4 @@
-model : lstmalbertattn    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn}
+model : bert    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn,TestLSTMConvATTN}
  
 # (비일반화) : base feature만 사용
 # - lstm,lstmattn,bert
@@ -20,30 +20,32 @@ device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
 file_name: train_data.csv
+# file_name : time_train.csv
 test_file_name: test_data.csv
+# test_file_name : time_test.csv
 
 asset_dir: asset/
 model_dir: models/
 output_dir: output/
 
-max_seq_len: 20
+max_seq_len: 24
 num_workers: 1
 
 ##K-fold params
-use_kfold : True #n개의 fold를 이용하여 k-fold를 진행한다.
+use_kfold : False #n개의 fold를 이용하여 k-fold를 진행한다.
 use_stratify : False
 n_fold : 5
 split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
 hidden_dim : 128
-n_layers : 4
+n_layers : 2
 n_heads : 2
 drop_out: 0.2
 
 #train
 n_epochs: 20
-batch_size: 64
+batch_size: 128
 lr: 0.0001
 clip_grad : 10
 patience : 20
@@ -53,6 +55,7 @@ split_ratio : 0.7
 #중요
 optimizer : adamW
 scheduler: linear_warmup
+# plateau #linear_warmup
    
    
 #use only in lgbm
