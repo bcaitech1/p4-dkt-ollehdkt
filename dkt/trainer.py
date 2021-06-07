@@ -448,10 +448,9 @@ def get_model(args):
 # 배치 전처리 일반화
 def process_batch_v2(batch, args):
     # batch : load_data_from 에서 return 시킬 feature(컬럼)
-    # test, question,tag,correct, test_level_diff, tag_mean,tag_sum,ans_rate,mask = batch
+    # test, question,tag,correct, mask = batch
     # 규칙 : mask는 항상 맨 뒤임
     # print(type(batch))
-    # print(batch)
     test = batch[0]
     question = batch[1]
     tag = batch[2]

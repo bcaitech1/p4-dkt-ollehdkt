@@ -1306,7 +1306,7 @@ class LSTM(nn.Module):
 
         self.hidden_dim = self.args.hidden_dim
         self.n_layers = self.args.n_layers
-        self.cont_cols=self.args.cont_cols
+        self.cont_cols=1
 
         # Embedding 
         # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
@@ -1348,28 +1348,29 @@ class LSTM(nn.Module):
 
     def forward(self, input):
 
-        test, question, tag, _, mask, interaction, solve_time,_ = input
-
+        test, question, tag, _, mask,interaction,solve_time, _ = input
+        
         batch_size = interaction.size(0)
 
         # Embedding
-
+        solve_time=solve_time.unsqueeze(-1).type(torch.FloatTensor).to(self.device)
         embed_interaction = self.embedding_interaction(interaction)
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
         embed_tag = self.embedding_tag(tag)
         
         embed_cont=self.cont_proj(solve_time)
-
+        # print(embed_cont.shape)
+        # print("-"*80)
         embed = torch.cat([embed_interaction,
                            embed_test,
                            embed_question,
                            embed_tag,], 2)
 
         X = self.comb_proj(embed)
-        print(X.shape,embed_cont.shape)
+        print("범주형과 연속형의 shape: ",X.shape,embed_cont.shape)
         X=torch.cat([X, embed_cont], 2)
-
+        # print("둘은 concat한 shape: ",X.shape)
         hidden = self.init_hidden(batch_size)
         out, hidden = self.lstm(X, hidden)
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)

@@ -267,7 +267,7 @@ class TestDKTDataset(torch.utils.data.Dataset):
         seq_len = len(row[0])
         print(f'row 값 : {len(row)}')
 
-        # test, question, tag, correct, test_level_diff, tag_mean, tag_sum, ans_rate
+        # test, question, tag, correct, solve_time
         cate_cols = [row[i] for i in range(len(row))]
         
 
