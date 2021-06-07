@@ -55,7 +55,7 @@ class Preprocess:
 
     def __preprocessing(self, df, is_train = True):
         cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
-
+        
         if not os.path.exists(self.args.asset_dir):
             os.makedirs(self.args.asset_dir)
             
@@ -143,8 +143,8 @@ class Preprocess:
         # columns.extend(['test_level_diff','tag_sum','tag_mean','ans_rate'])
         columns.extend(list(df.columns[col_cnt:]))
         self.args.n_other_features = [ int(df[i].nunique()) for i in df.columns[col_cnt:]] # 컬럼 순서 꼭 맞출 것!, 추가 컬럼(feature)의 고윳값 수
-        
-        ret = ['testId','assessmentItemID','KnowledgeTag','answerCode']
+        columns.append('solve_time')
+        ret = ['testId','assessmentItemID','KnowledgeTag','solve_time','answerCode']
         ret.extend(list(df.columns[col_cnt:]))
         print(ret)
         group = df[columns].groupby('userID').apply(
@@ -231,10 +231,9 @@ class MyDKTDataset(torch.utils.data.Dataset):
         seq_len = len(row[0])
         # print(f'row 값 : {len(row)}')
 
-        # test, question, tag, correct, test_level_diff, tag_mean, tag_sum, ans_rate
+        # test, question, tag, correct, solve_time
         cate_cols = [row[i] for i in range(len(row))]
-        
-
+  
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
         if seq_len > self.args.max_seq_len:
             for i, col in enumerate(cate_cols):

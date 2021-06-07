@@ -1,4 +1,4 @@
-model : saint    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn}
+model : lstm    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn}
  
 # (비일반화) : base feature만 사용
 # - lstm,lstmattn,bert
@@ -19,8 +19,8 @@ seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
-file_name: train_data.csv
-test_file_name: test_data.csv
+file_name: time_train.csv
+test_file_name: time_test.csv
 
 asset_dir: asset/
 model_dir: models/
@@ -50,6 +50,7 @@ patience : 20
 log_steps : 50
 split_ratio : 0.7
 
+cont_cols : 1
 #중요
 optimizer : adamW
 scheduler: plateau

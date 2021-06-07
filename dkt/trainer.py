@@ -456,6 +456,7 @@ def process_batch_v2(batch, args):
     question = batch[1]
     tag = batch[2]
     correct = batch[3]
+    solve_time=batch[-2]
     mask = batch[len(batch)-1]
     # change to float
     mask = mask.type(torch.FloatTensor)

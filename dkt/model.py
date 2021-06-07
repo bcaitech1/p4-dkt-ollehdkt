@@ -1306,6 +1306,7 @@ class LSTM(nn.Module):
 
         self.hidden_dim = self.args.hidden_dim
         self.n_layers = self.args.n_layers
+        self.cont_cols=self.args.cont_cols
 
         # Embedding 
         # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
@@ -1314,8 +1315,11 @@ class LSTM(nn.Module):
         self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
         self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
 
+        #continuous
+        self.cont_proj=nn.Linear(self.cont_cols,self.hidden_dim//2)
+
         # embedding combination projection
-        self.comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim)
+        self.comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim//2)
 
         self.lstm = nn.LSTM(self.hidden_dim,
                             self.hidden_dim,
@@ -1344,7 +1348,7 @@ class LSTM(nn.Module):
 
     def forward(self, input):
 
-        test, question, tag, _, mask, interaction, _ = input
+        test, question, tag, _, mask, interaction, solve_time,_ = input
 
         batch_size = interaction.size(0)
 
@@ -1355,6 +1359,7 @@ class LSTM(nn.Module):
         embed_question = self.embedding_question(question)
         embed_tag = self.embedding_tag(tag)
         
+        embed_cont=self.cont_proj(solve_time)
 
         embed = torch.cat([embed_interaction,
                            embed_test,
@@ -1362,6 +1367,8 @@ class LSTM(nn.Module):
                            embed_tag,], 2)
 
         X = self.comb_proj(embed)
+        print(X.shape,embed_cont.shape)
+        X=torch.cat([X, embed_cont], 2)
 
         hidden = self.init_hidden(batch_size)
         out, hidden = self.lstm(X, hidden)
