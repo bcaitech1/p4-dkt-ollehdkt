@@ -295,7 +295,7 @@ def validate(valid_loader, model, args):
         # input = process_batch(batch, args)
         if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
             or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint) or isinstance(model, AutoEncoderLSTMATTN):
-            input = process_batch_v2(batch, args)
+            input = process_batch(batch, args)
         else:
             input = process_batch(batch,args)
 
