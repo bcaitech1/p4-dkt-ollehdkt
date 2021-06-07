@@ -246,7 +246,7 @@ def train(train_loader, model, optimizer, args):
         # input = process_batch_test(batch, args)
         if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
             or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint) or isinstance(model,LSTM) or isinstance(model, AutoEncoderLSTMATTN):
-            input = process_batch_v2(batch, args)
+            input = process_batch(batch, args)
         else:
             input = process_batch(batch,args)
         # print(f"input 텐서 사이즈 : {type(input)}, {len(input)}")
@@ -345,7 +345,7 @@ def inference(args, test_data):
     for step, batch in enumerate(test_loader):
         # input = process_batch(batch, args)
         # input = process_batch_test(batch,args)
-        input = process_batch_v2(batch,args)
+        input = process_batch(batch,args)
 
         preds = model(input)
         
@@ -579,13 +579,15 @@ def process_batch_test(batch, args):
 
 # 배치 전처리(기본 feature만 쓸 때, baseline)
 def process_batch(batch, args):
-    if len(batch)==6:
-        test, question, tag, correct, test_level_diff, mask = batch
-    else:
-        test, question, tag, correct, mask = batch
+    # print("배치",batch)
+    # print('process batch의 사이즈',len(batch))
+    test, question, tag, solve_time,correct, mask = batch
+
+    # print("시간",solve_time)
     # test, question, tag, correct, mask = batch # base
     # print(type(batch))
     # change to float
+    solve_time = solve_time.type(torch.FloatTensor)
     mask = mask.type(torch.FloatTensor)
     correct = correct.type(torch.FloatTensor)
 
@@ -606,9 +608,6 @@ def process_batch(batch, args):
     test = ((test + 1) * mask).to(torch.int64)
     question = ((question + 1) * mask).to(torch.int64)
     tag = ((tag + 1) * mask).to(torch.int64)
-    if len(batch)==6: # train시
-        test_level_diff = ((test_level_diff+1) * mask).to(torch.int64)
-
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
@@ -628,20 +627,13 @@ def process_batch(batch, args):
 
     interaction = interaction.to(args.device)
     gather_index = gather_index.to(args.device)
-
+    solve_time=solve_time.to(args.device)
     # dev
-    if len(batch)!=6:
-        
-        return (test, question,
-            tag, correct, mask,
-            interaction, gather_index)
-    test_level_diff = test_level_diff.to(args.device)
     # return (test, question,
     #         tag, correct, mask,
     #         interaction, gather_index) # base
     return (test, question,
-    tag, correct, mask, interaction, test_level_diff, gather_index)
-
+    tag, correct, mask, interaction, solve_time, gather_index)
 
 # loss계산하고 parameter update!
 def compute_loss(preds, targets):

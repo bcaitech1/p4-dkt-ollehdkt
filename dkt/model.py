@@ -1347,13 +1347,14 @@ class LSTM(nn.Module):
         return (h, c)
 
     def forward(self, input):
+        test, question,tag, correct, mask, interaction, solve_time, gather_index=input
 
-        test, question, tag, _, mask,interaction,solve_time, _ = input
+        # test, question, tag, _, mask,interaction,solve_time, _ = input
         
         batch_size = interaction.size(0)
 
         # Embedding
-        solve_time=solve_time.unsqueeze(-1).type(torch.FloatTensor).to(self.device)
+        solve_time=solve_time.unsqueeze(-1)
         embed_interaction = self.embedding_interaction(interaction)
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
@@ -1368,7 +1369,7 @@ class LSTM(nn.Module):
                            embed_tag,], 2)
 
         X = self.comb_proj(embed)
-        print("범주형과 연속형의 shape: ",X.shape,embed_cont.shape)
+        # print("범주형과 연속형의 shape: ",X.shape,embed_cont.shape)
         X=torch.cat([X, embed_cont], 2)
         # print("둘은 concat한 shape: ",X.shape)
         hidden = self.init_hidden(batch_size)

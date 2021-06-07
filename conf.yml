@@ -37,12 +37,12 @@ split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
 hidden_dim : 128
-n_layers : 4
+n_layers : 2
 n_heads : 2
 drop_out: 0.2
 
 #train
-n_epochs: 5
+n_epochs: 1
 batch_size: 64
 lr: 0.0001
 clip_grad : 10
