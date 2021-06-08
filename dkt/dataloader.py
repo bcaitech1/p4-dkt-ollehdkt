@@ -4,7 +4,7 @@ import time
 import tqdm
 import pandas as pd
 import random
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler
 import numpy as np
 import torch
 
@@ -153,11 +153,29 @@ class Preprocess:
         ret.extend(list(df.columns[col_cnt:]))
         print('보낼 최종컬럼 확인')
         print(ret)
+
+        num_cols = ['solve_time']
+
+        ## scalers
+        std_scaler = StandardScaler()
+        nrm_scaler = MinMaxScaler()
+
+        ## scaling 작업
+        if type(df[num_cols]) == pd.core.series.Series:
+            df[num_cols] = std_scaler.fit_transform(df[num_cols].to_frame())
+            df[num_cols] = nrm_scaler.fit_transform(df[num_cols].to_frame())
+
+        else:
+            df[num_cols] = std_scaler.fit_transform(df[num_cols])
+            df[num_cols] = nrm_scaler.fit_transform(df[num_cols])
+
+        
+
         group = df[columns].groupby('userID').apply(
                 lambda r: tuple([r[i].values for i in ret])
             )
         
-        len(f'group.values->{len(group.values)}')
+        print(f'group.values->{len(group.values)}')
         return group.values
 
     def load_data_from_file_v2(self, file_name, is_train=True):
@@ -492,7 +510,7 @@ def get_loaders(args, train, valid):
         # trainset = DKTDataset(train, args)
         # trainset = DevDKTDataset(train,args)
         # trainset = TestDKTDataset(train,args) # 범주형, 연속형
-        trainset = MyDKTDataset(train,args)
+        trainset = TestDKTDataset(train,args)
         if isinstance(trainset,TestDKTDataset):
             train_loader = torch.utils.data.DataLoader(trainset, num_workers=args.num_workers, shuffle=True,
                             batch_size=args.batch_size, pin_memory=pin_memory, collate_fn=collate_v2)
@@ -503,7 +521,7 @@ def get_loaders(args, train, valid):
         # valset = DKTDataset(valid, args)
         # valset = DevDKTDataset(valid,args)
         # valset = TestDKTDataset(valid,args) # 범주형, 연속형
-        valset = MyDKTDataset(valid,args)
+        valset = TestDKTDataset(valid,args)
         # print('inference gogo')
         if isinstance(valset,TestDKTDataset):
             valid_loader = torch.utils.data.DataLoader(valset, num_workers=args.num_workers, shuffle=False,
