@@ -22,7 +22,7 @@ if __name__ == "__main__":
     with open(term_args.conf) as f:
         cf = yaml.load(f, Loader=yaml.FullLoader)
     args = AttrDict(cf)
-
+    # args.concat_reverse = False # 범주형, 연속형 순으로 합침(False), 그 반대 True
     # args = parse_args(mode='train')
     os.makedirs(args.model_dir, exist_ok=True)
 

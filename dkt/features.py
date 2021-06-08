@@ -269,12 +269,14 @@ class Features:
         for i in df.columns:
             print(f'컬럼 {i}의 고윳값 개수 : {str(df[i].nunique())}')
 
-        tmp_list = ['user_correct_answer','user_total_answer'] # 소숫점화 시킬 대상
-        for i in tmp_list:
-            m = df[i].max()
-            print(f'최댓값 : {m}')
-            df[i]=df[i].fillna(0).apply(lambda x : x/(10**len(str(int(m)))))
-        df['user_acc'] = df['user_acc'].fillna(0).apply(lambda x : x)
+        # tmp_list = ['user_correct_answer','user_total_answer'] # 소숫점화 시킬 대상
+        # for i in tmp_list:
+        #     m = df[i].max()
+        #     print(f'최댓값 : {m}')
+        #     df[i]=df[i].fillna(0).apply(lambda x : x/(10**len(str(int(m)))))
+        df['user_acc'] = df['user_acc'].fillna(0)
+        df['user_correct_answer'] = df['user_correct_answer'].fillna(0)
+        df['user_total_answer'] = df['user_total_answer'].fillna(0)
         return df[['user_acc','user_correct_answer', 'user_total_answer']]
 
     # 그룹병 정답 누적합
@@ -333,4 +335,12 @@ class Features:
         df['solve_time'] = df['solve_time'].apply(lambda x:x/(10**(len(f'{max}'))))
 
         return df
+
+    # 풀이시간대 별 정답률
+    def hour_rate(df):
+        test_df = df.groupby(['hour'])['hour'].count().reset_index(name='hour_cnt')
+        test_ans_df = df.groupby(['hour'])['answerCode'].sum().reset_index(name='hour_ans_cnt')
+        test_df = test_df.merge(test_ans_df, on ='hour', how='left')
+        test_df['hour_rate'] = round(test_df['hour_ans_cnt'] / test_df['hour_cnt'], 2)
+        return test_df
 

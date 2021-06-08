@@ -165,7 +165,6 @@ def run_kfold(args, train_data):
     oof = np.zeros(train_data.shape[0])
 
     for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data, target)):
-        print(f'{fold}fold를 수행합니다')
         trn_data = train_data[train_idx]
         val_data = train_data[valid_idx]
         
@@ -251,13 +250,16 @@ def train(train_loader, model, optimizer, args):
             input = process_batch_v2(batch, args)
         elif isinstance(model,TestLSTMConvATTN):
             # print('process_batch_v3 사용')
+            # print(type(batch))
             input = process_batch_v3(batch,args)
         else:
             input = process_batch(batch,args)
         # print(f"input 텐서 사이즈 : {type(input)}, {len(input)}")
         preds = model(input)
-        targets = input[3] # correct
-
+        # targets = input[3] # correct
+        targets = input[len(args.cate_cols)]
+        # print(f'targets : {targets}')
+        # print(f'targets : {targets}')
 
         loss = compute_loss(preds, targets)
         update_params(loss, model, optimizer, args)
@@ -310,7 +312,8 @@ def validate(valid_loader, model, args):
 
 
         preds = model(input)
-        targets = input[3] # correct
+        # targets = input[3] # correct
+        targets = input[len(args.cate_cols)]
 
 
         # predictions
@@ -460,17 +463,14 @@ def get_model(args):
 
 def process_batch_v3(batch,args):
 
-    # type -> 1: 범주형
+    # batch 순서 : (범주형)...,(answerCode), (연속형)..., mask
 
-    # batch : load_data_from 에서 return 시킬 feature(컬럼)
-    # test, question,tag,correct, test_level_diff, tag_mean,tag_sum,ans_rate,mask = batch
-    # 규칙 : mask는 항상 맨 뒤임
-    # print(type(batch))
-    # print(batch)
-    test = batch[0]
-    question = batch[1]
-    tag = batch[2]
-    correct = batch[3]
+    cate_cols = [batch[i] for i in range(len(args.cate_cols))]
+    
+    # test = batch[0]
+    # question = batch[1]
+    # tag = batch[2]
+    correct = batch[len(args.cate_cols)]
     mask = batch[len(batch)-1]
     # change to float
     mask = mask.type(torch.FloatTensor)
@@ -486,17 +486,18 @@ def process_batch_v3(batch,args):
     interaction = (interaction * interaction_mask).to(torch.int64)
     
     #  test_id, question_id, tag
-    test = ((test + 1) * mask).to(torch.int64)
-    question = ((question + 1) * mask).to(torch.int64)
-    tag = ((tag + 1) * mask).to(torch.int64)
+    # test = ((test + 1) * mask).to(torch.int64)
+    # question = ((question + 1) * mask).to(torch.int64)
+    # tag = ((tag + 1) * mask).to(torch.int64)
+    for i in range(len(cate_cols)):
+        cate_cols[i] = ((cate_cols[i])*mask).to(torch.int64)
+        cate_cols[i] = cate_cols[i].to(args.device)
 
-    new_batch = [None for i in range((len(batch)-5))]
-    # 기타 features
-    # for i in range(4,len(batch)-1):
-    #     new_batch[i-4] = ((batch[i]+1)*mask).to(torch.int64)
-
-    for i in range(4,len(batch)-1):
-        new_batch[i-4] = batch[i]
+    new_batch = [None for i in range(len(args.cate_cols)+1,len(batch)-1)] # 연속형 컬럼값을 저장하기 위한 list
+    
+    # 연속형
+    for i in range(len(args.cate_cols)+1,len(batch)-1):
+        new_batch[i-(len(args.cate_cols)+1)] = batch[i]
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
@@ -504,32 +505,23 @@ def process_batch_v3(batch,args):
     gather_index = gather_index.view(-1, 1) - 1
 
     # device memory로 이동
-    m=0
-    test = test.to(args.device)
-    m=max(torch.max(test),m)
-    question = question.to(args.device)
-    m=max(torch.max(question),m)
-
-    tag = tag.to(args.device)
-    m=max(torch.max(tag),m)
-    correct = correct.to(args.device)
-    m=max(torch.max(correct),m)
-    mask = mask.to(args.device)
-    m=max(torch.max(mask),m)
 
     interaction = interaction.to(args.device)
-    m=max(torch.max(interaction),m)
+    # m=max(torch.max(interaction),m)
     gather_index = gather_index.to(args.device)
 
     # 기타 feature를 args의 device에 load
     for i in range(len(new_batch)):
         new_batch[i] = new_batch[i].to(args.device)
-        m=max(torch.max(new_batch[i]),m)
+        
 
-    ret = [test,question,tag,correct,mask,interaction]
+    ret = []
+    ret.extend(cate_cols)
+    ret.extend([correct,mask,interaction])
     ret.extend(new_batch)
     ret.append(gather_index)
-    # print(f"최댓값 : {m}")
+    # 반환 :  (범주형),(mask),(interaction),(연속형),(gather_index)
+    
     return tuple(ret)
 
 # 배치 전처리 일반화
