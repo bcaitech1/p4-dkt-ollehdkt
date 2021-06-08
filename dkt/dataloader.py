@@ -165,6 +165,10 @@ class Preprocess:
         self.args.cont_cols = ['solve_time','user_acc','user_correct_answer', 'user_total_answer'] # 실험할 연속형 (user_acc) 'user_acc','user_correct_answer', 'user_total_answer'
         df = self.__preprocessing_v2(df, is_train)
 
+        # 유효 컬럼만 거르기 (Optional)
+        self.args.cate_cols = [col for col in list(self.args.cate_cols) if col in df.columns]
+        self.args.cont_cols = [col for col in list(self.args.cont_cols) if col in df.columns]
+
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용 
         
         d= {} # key는 컬럼명, values는 임베딩 시킬 수

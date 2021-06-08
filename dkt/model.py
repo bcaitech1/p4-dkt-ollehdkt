@@ -48,7 +48,7 @@ class TestLSTMConvATTN(nn.Module):
         self.args = args
         self.device = args.device
 
-        self.hidden_dim = self.args.hidden_dim//3
+        self.hidden_dim = self.args.hidden_dim
         self.n_layers = self.args.n_layers
         self.n_heads = self.args.n_heads
         self.drop_out = self.args.drop_out
@@ -98,7 +98,7 @@ class TestLSTMConvATTN(nn.Module):
         self.config = ConvBertConfig( 
             3, # not used
             hidden_size=self.n_embedding_hidden_dim+((self.hidden_dim//2)*self.cont_cols_cnt),
-            num_hidden_layers=1,
+            num_hidden_layers=2,
             num_attention_heads=self.n_heads,
             intermediate_size=self.hidden_dim,
             hidden_dropout_prob=self.drop_out,
