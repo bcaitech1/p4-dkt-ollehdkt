@@ -27,19 +27,6 @@ from transformers import BertPreTrainedModel
 
 import re
 
-class CFG:
-    seed=42
-    device='cuda 0'
-    batch_size=16
-
-    dropout=0.2
-    emb_size=128
-    hidden_size=128
-    n_layers=2
-    nheads=8
-
-    seq_len=32
-    target_size=3
 
 class TestLSTMConvATTN(nn.Module):
     def __init__(self, args):
@@ -423,8 +410,7 @@ class Saint(nn.Module):
         self.device = args.device
 
         self.hidden_dim = self.args.hidden_dim
-        # self.dropout = self.args.dropout
-        self.dropout = 0.
+        self.dropout = self.args.drop_out
         
         ### Embedding 
         # ENCODER embedding
@@ -1676,17 +1662,23 @@ class LSTMATTN(nn.Module):
         self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
         self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
 
-        #continuous
-        self.cont_proj=nn.Sequential(                
-            nn.Linear(self.cont_cols, self.hidden_dim//2),
-            nn.LayerNorm(self.hidden_dim//2),
-        )
+        # #continuous
+        # self.cont_proj=nn.Sequential(   
+        #     nn.LayerNorm(self.hidden_dim//2),             
+        #     nn.Linear(self.cont_cols, self.hidden_dim//2),
+        #     # nn.LayerNorm(self.hidden_dim//4)  #layerNorm 순서 변경
+        # )
+
+        # # embedding combination projection
+        # self.comb_proj = nn.Sequential(                
+        #     nn.Linear((self.hidden_dim//3)*4, self.hidden_dim//2),
+        #     # nn.LayerNorm((self.hidden_dim//4)*3),
+        # )
+
+        self.cont_proj=nn.Linear(self.cont_cols,self.hidden_dim//2)
 
         # embedding combination projection
-        self.comb_proj = nn.Sequential(                
-            nn.Linear((self.hidden_dim//3)*4, self.hidden_dim//2),
-            nn.LayerNorm(self.hidden_dim//2),
-        )
+        self.comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim//2)
 
         self.lstm = nn.LSTM(self.hidden_dim,
                             self.hidden_dim,
@@ -1730,9 +1722,9 @@ class LSTMATTN(nn.Module):
 
         batch_size = interaction.size(0)
 
-        # Embedding
+        # Embedding shape(batch, max_seq_len,64) 
         solve_time=solve_time.unsqueeze(-1)
-        embed_interaction = self.embedding_interaction(interaction)
+        embed_interaction = self.embedding_interaction(interaction) #(batch, max_seq_len, 64)
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
         embed_tag = self.embedding_tag(tag)
@@ -1745,7 +1737,7 @@ class LSTMATTN(nn.Module):
                            embed_tag,], 2)
 
         X = self.comb_proj(embed)
-        X=torch.cat([X, embed_cont], 2)
+        X=torch.cat([X, embed_cont], 2) #(batch,msl, 128)
 
         hidden = self.init_hidden(batch_size)
         # print(f'{hidden[0].shape}, {hidden[1].shape}')

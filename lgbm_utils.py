@@ -29,6 +29,11 @@ def make_sharing_feature(args):
     df = pd.read_csv(csv_file_path)#, nrows=100000)
     csv_file_path = os.path.join(args.data_dir, args.test_file_name)
     tdf = pd.read_csv(csv_file_path)#, nrows=100000)
+
+    if args.use_distance:
+        df['distance']=np.load('/opt/ml/np_train_tag_distance_arr.npy')
+        tdf['distance']=np.load('/opt/ml/np_test_tag_distance_arr.npy')
+        
     tdf=tdf[tdf['userID']==tdf['userID'].shift(-1)]
     df=pd.concat([df,tdf],ignore_index=True)
     return df
@@ -387,7 +392,7 @@ def make_lgb_user_oof_prediction(args, train, test, features, categorical_featur
         gc.collect()
         
     print(f"\nMean AUC = {score}") # 폴드별 Validation 스코어 출력
-    print(f"\nMean ACC = {acc}") # 폴드별 Validation 스코어 출력
+    print(f"Mean ACC = {acc}") # 폴드별 Validation 스코어 출력
     # print(f"OOF AUC = {roc_auc_score(y, y_oof)}") # Out Of Fold Validation 스코어 출력
     
     # 폴드별 피처 중요도 평균값 계산해서 저장 

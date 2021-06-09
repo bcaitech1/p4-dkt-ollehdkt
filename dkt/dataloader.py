@@ -118,10 +118,19 @@ class Preprocess:
             return df
         
 
-    def load_data_from_file_v2(self, file_name, is_train=True):
+    def load_data_from_file(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
         print(f'csv_file_path : {csv_file_path}')
         df = pd.read_csv(csv_file_path)
+        
+        if self.args.model=='lgbm':
+            #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
+            # df['distance']=np.load('/opt/ml/np_train_tag_distance_arr.npy') if is_train else np.load('/opt/ml/np_test_tag_distance_arr.npy')
+
+            df.sort_values(by=['userID','Timestamp'], inplace=True)
+            return df
+
+        
         col_cnt = len(df.columns)
         df = self.__feature_engineering(df)
         df = self.__preprocessing(df, is_train)
@@ -155,69 +164,13 @@ class Preprocess:
         return group.values
 
 
-    def load_data_from_file(self, file_name, is_train=True):
-        csv_file_path = os.path.join(self.args.data_dir, file_name)
-        df = pd.read_csv(csv_file_path)#, nrows=100000)
-        
-         
-        
-        if self.args.model=='lgbm':
-            #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
-            df.sort_values(by=['userID','Timestamp'], inplace=True)
-            return df
-
-        df = self.__feature_engineering(df)
-        df = self.__preprocessing(df, is_train)
-       
-        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용     
-
-        # default 태그
-        self.args.n_test_level_diff = 2563 # 변별력 고유값 개수 : 2563
-        self.args.n_ans_rate = 79
-        self.args.n_tag_sum = 798
-        self.args.n_tag_mean = 908
-        print(df.columns)
-
-        df = df.sort_values(by=['userID','Timestamp'], axis=0)
-        # columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag']
-        columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag']
-        if 'test_level_diff' not in df.columns:
-            group = df[columns].groupby('userID').apply(
-                    lambda r: (
-                        r['testId'].values, 
-                        r['assessmentItemID'].values,
-                        r['KnowledgeTag'].values,
-                        r['answerCode'].values,
-                        #dev
-                        # r['test_level_diff'].values
-                    )
-                )
-        else:
-            # columns.append('test_level_diff')
-            columns.extend(['test_level_diff','tag_sum','tag_mean','ans_rate'])
-            group = df[columns].groupby('userID').apply(
-                    lambda r: (
-                        r['testId'].values, 
-                        r['assessmentItemID'].values,
-                        r['KnowledgeTag'].values,
-                        r['answerCode'].values,
-                        #dev
-                        r['test_level_diff'].values,
-                        r['tag_mean'].values,
-                        r['tag_sum'].values,
-                        r['ans_rate'].values
-                    )
-                )
-
-        return group.values
-
     def load_train_data(self, file_name):
         # self.train_data = self.load_data_from_file(file_name)
-        self.train_data = self.load_data_from_file_v2(file_name)
+        self.train_data = self.load_data_from_file(file_name)
 
     def load_test_data(self, file_name):
         # self.test_data = self.load_data_from_file(file_name, is_train= False)
-        self.test_data = self.load_data_from_file_v2(file_name,is_train=False)
+        self.test_data = self.load_data_from_file(file_name,is_train=False)
 
 class MyDKTDataset(torch.utils.data.Dataset):
     def __init__(self,data, args):

@@ -13,7 +13,7 @@ from .criterion import get_criterion
 from .metric import get_metric
 import wandb
 
-from .model import *
+from .models_architecture import *
 from lgbm_utils import *
 from .new_model import Bert,LSTMATTN
 
@@ -27,7 +27,8 @@ import wandb
 
 def run(args, train_data, valid_data):
     lgbm_params=args.lgbm.model_params
-    
+    print(f'{args.model}모델을 사용합니다')
+    print('-'*80)
     
     train_loader, valid_loader = get_loaders(args, train_data, valid_data)
     
@@ -59,6 +60,7 @@ def run(args, train_data, valid_data):
     scheduler = get_scheduler(optimizer, args)
 
     best_auc = -1
+    accuracy = -1
     early_stopping_counter = 0
     for epoch in range(args.n_epochs):
 
@@ -76,6 +78,7 @@ def run(args, train_data, valid_data):
                   "valid_auc":auc, "valid_acc":acc})
         if auc > best_auc:
             best_auc = auc
+            accuracy = acc
             # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
             model_to_save = model.module if hasattr(model, 'module') else model
             save_checkpoint({
@@ -97,6 +100,9 @@ def run(args, train_data, valid_data):
             scheduler.step(best_auc)
         else:
             scheduler.step()
+    
+    print(f"best AUC : {best_auc}, accuracy : {accuracy}")
+
 
 def run_kfold(args, train_data):
     n_splits = args.n_fold
@@ -106,14 +112,18 @@ def run_kfold(args, train_data):
         
         csv_file_path = os.path.join(args.data_dir, args.file_name)
         train_df = pd.read_csv(csv_file_path)#, nrows=100000)
-        
+
         csv_file_path = os.path.join(args.data_dir, args.test_file_name)
         test_df = pd.read_csv(csv_file_path)#, nrows=100000)
-        
+ 
         if args.use_test_data:#test의 데이터까지 사용할 경우
             train_df=make_sharing_feature(args)
             
         train_df=make_lgbm_feature(args,train_df)
+
+        if args.use_distance:
+            test_df['distance']=np.load('/opt/ml/np_test_tag_distance_arr.npy')
+        
         test_df=make_lgbm_feature(args,test_df)
         
         delete_feats=['userID','assessmentItemID','testId','answerCode','Timestamp','sec_time']
@@ -244,8 +254,8 @@ def train(train_loader, model, optimizer, args):
         # print(len(batch))
         # input = process_batch(batch, args)
         # input = process_batch_test(batch, args)
-        if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
-            or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint) or isinstance(model,LSTM) or isinstance(model, AutoEncoderLSTMATTN):
+        if isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
+             or isinstance(model, TfixupSaint) or isinstance(model,LSTM) or isinstance(model, AutoEncoderLSTMATTN):
             input = process_batch(batch, args)
         else:
             input = process_batch(batch,args)
@@ -293,8 +303,8 @@ def validate(valid_loader, model, args):
     total_targets = []
     for step, batch in enumerate(valid_loader):
         # input = process_batch(batch, args)
-        if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
-            or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint) or isinstance(model, AutoEncoderLSTMATTN):
+        if isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
+             or isinstance(model, TfixupSaint) or isinstance(model, AutoEncoderLSTMATTN):
             input = process_batch(batch, args)
         else:
             input = process_batch(batch,args)

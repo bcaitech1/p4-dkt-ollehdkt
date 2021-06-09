@@ -1,4 +1,4 @@
-model : lstmattn    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn}
+model : lgbm   # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn}
  
 # (비일반화) : base feature만 사용
 # - lstm,lstmattn,bert
@@ -14,26 +14,26 @@ wandb :
         - baseline
 
 ##main params
-task_name: cont_lstmattn_layer_norm
+task_name: lgbm_real_timeset
 seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
-file_name: time_train.csv
-test_file_name: time_test.csv
+file_name: real_train_inter_time.csv
+test_file_name: real_test_inter_time.csv
 
 asset_dir: asset/
 model_dir: models/
 output_dir: output/
 
-max_seq_len: 30
+max_seq_len: 128
 num_workers: 1
 
 ##K-fold params
-use_kfold : False #n개의 fold를 이용하여 k-fold를 진행한다.
-use_stratify : False
+use_kfold : True #n개의 fold를 이용하여 k-fold를 진행한다.
+use_stratify : True
 n_fold : 5
-split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
+split_by_user : True #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
 hidden_dim : 128
@@ -42,13 +42,13 @@ n_heads : 2
 drop_out: 0.2
 
 #train
-n_epochs: 10
+n_epochs: 15
 batch_size: 64
 lr: 0.0001
 clip_grad : 10
-patience : 20
+patience : 5
 log_steps : 50
-split_ratio : 0.7
+split_ratio : 0.8
 
 cont_cols : 1
 #중요
@@ -62,8 +62,8 @@ lgbm:
                     'objective': 'binary', # 이진 분류
                     'boosting_type': 'gbdt',
                     'metric': 'auc', # 평가 지표 설정
-                    'feature_fraction': 0.8, # 원래 0.8 피처 샘플링 비율
-                    'bagging_fraction': 0.8, # 원래 0.8 데이터 샘플링 비율
+                    'feature_fraction': 0.4, # 원래 0.8 피처 샘플링 비율
+                    'bagging_fraction': 0.6, # 원래 0.8 데이터 샘플링 비율
                     'bagging_freq': 1,
                     'n_estimators': 10000, # 트리 개수
                     'early_stopping_rounds': 100,
@@ -80,3 +80,6 @@ lgbm:
 ## LGBM feature enginnering 용 args
 make_sharing_feature : True #extract statistics featrue from train + test(except last rows)
 use_test_data : True #use test_data for train
+
+# distance 피처 쓰기
+use_distance : False
