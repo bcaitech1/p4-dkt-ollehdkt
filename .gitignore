@@ -4,6 +4,7 @@ output
 wandb
 src
 output
+notebooks
 
 #add when u clone this file
 conf.yml

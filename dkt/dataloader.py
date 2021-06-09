@@ -15,6 +15,8 @@ n_unique = 0
 
 from lgbm_utils import *
 
+import gc
+
 n_cate_cols = 0
 n_cont_cols = 0
 class Preprocess:
@@ -105,7 +107,7 @@ class Preprocess:
                 label_path = os.path.join(self.args.asset_dir,col+'_classes.npy')
                 le.classes_ = np.load(label_path)
                 df[col] = df[col].apply(lambda x: x if x in le.classes_ else 'unknown')
-
+            
             #모든 컬럼이 범주형이라고 가정
             df[col]= df[col].astype(str)
             test = le.transform(df[col])
@@ -142,10 +144,17 @@ class Preprocess:
             print(f'fe 시 컬럼 확인 : {df.columns}')
             print(df.columns)
 
+            if self.args.file_name == 'train_inter_time (1).csv' or self.args.file_name == 'test_inter_time (1).csv':
+                # df['hour'] = df.sec_time.apply(lambda x : f'h-{x//3600}')
+                # df['min'] = df.sec_time.apply(lambda x : f'm-{(x%3600)//60}')
+                # df['sec'] = df.sec_time.apply(lambda x : f's-{x%60}')
+                # df['solve_time'] = df['solve_time'].apply(lambda x : f's-{x}')
+                pass
+
             print('dataframe 확인')
             print(df)
 
-            drop_cols = ['_',"index","point","answer_min_count","answer_max_count","user_count",'sec_time'] # drop할 칼럼
+            drop_cols = ['_',"index","point","answer_min_count","answer_max_count","user_count","sec_time"] # drop할 칼럼
             for col in drop_cols:
                 if col in df.columns:
                     df.drop([col],axis=1, inplace=True)
@@ -161,8 +170,8 @@ class Preprocess:
         col_cnt = len(df.columns)
         df = self.__feature_engineering(df)
 
-        self.args.cate_cols = ['testId','assessmentItemID','KnowledgeTag'] # 실험할 범주형
-        self.args.cont_cols = ['solve_time','user_acc','user_correct_answer', 'user_total_answer'] # 실험할 연속형 (user_acc) 'user_acc','user_correct_answer', 'user_total_answer'
+        self.args.cate_cols = ['testId','assessmentItemID','KnowledgeTag',] # 실험할 범주형
+        self.args.cont_cols = ['solve_time'] # 실험할 연속형 (user_acc)'solve_time', 'user_acc','user_correct_answer', 'user_total_answer'
         df = self.__preprocessing_v2(df, is_train)
 
         # 유효 컬럼만 거르기 (Optional)
@@ -175,7 +184,8 @@ class Preprocess:
 
         for i in self.args.cate_cols:
             d[i] = len(np.load(os.path.join(self.args.asset_dir,f'{i}_classes.npy')))
-            
+        print(f'임베딩 사이즈 확인')
+        print(d)
         self.args.cate_dict = d
         # user_correct_answer, user_total_answer,user_acc
         print('컬럼 확인')
@@ -187,17 +197,16 @@ class Preprocess:
         # user_count 기준으로 other feature를 구성
 
         # columns.extend(['test_level_diff','tag_sum','tag_mean','ans_rate'])
-
+        columns.extend(list(self.args.cate_cols))
         columns.extend(list(self.args.cont_cols))
         self.args.n_other_features = [ int(df[i].nunique()) for i in df.columns[col_cnt:]] # 컬럼 순서 꼭 맞출 것!, 추가 컬럼(feature)의 고윳값 수
+
+        # 데이터 프레임 재정비
+
         
-        # ret_tmp = ['testId','assessmentItemID','KnowledgeTag'] # 어떤 범주형 컬럼을 남길 것인지
-        # ret_tmp_cont = ['solve_time','user_acc'] # 어떤 연속형 컬럼을 남길 것인지
-        # ret_tmp.append('answerCode')
-
         ret = []
-        ret_cont = []
-
+        
+        print(df)
         ret.extend(list(self.args.cate_cols))
         ret.append('answerCode')
         ret.extend(self.args.cont_cols)
@@ -209,13 +218,20 @@ class Preprocess:
             sys.exit()
             return
 
+        # new_df = df['userID']
+        # # new_df = pd.concat([df[i] for i in self.args.cate_cols],axis=1)
+        # for i in ret:
+        #     new_df[i] = df[i]
+        # df = new_df
+        # gc.collect()
+
         print('보낼 최종컬럼 확인')
         print(ret)
         group = df[columns].groupby('userID').apply(
                 lambda r: tuple([r[i].values for i in ret])
             )
         
-        len(f'group.values->{len(group.values)}')
+        print(f'group.values->{len(group.values)}')
         return group.values # 보낼 컬럼 = (범주형)  + (정답 여부) + (연속형)
         
     # 기본 범주형 4 + 연속형 조합을 쓰기 위한 load_data_from_file
@@ -301,7 +317,7 @@ class Preprocess:
         group = df[columns].groupby('userID').apply(
                 lambda r: tuple([r[i].values for i in ret])
             )
-        
+        del df # df는 더이상 쓰이지 않으므로 날림
         len(f'group.values->{len(group.values)}')
         return group.values
 
@@ -425,7 +441,9 @@ class TestDKTDataset(torch.utils.data.Dataset):
 
         # np.array -> torch.tensor 형변환
         for i, col in enumerate(cate_cols):
+            # print(f'{i}번째 {col} 값')
             ret_cols[i] = torch.tensor(col)
+            # print(f' 츨력 : {ret_cols[i]}')
         mask = torch.tensor(mask)
         ret_cols.append(mask) # 마스크 추가
         # ret_cols.append(cont_x) # 연속형 변수 추가
@@ -549,7 +567,14 @@ def collate_v2(batch):
             #앞부분에 마스킹을 넣어주어 sequential하게 interaction들을 학습하게 한다
             
             pre_padded = torch.zeros(max_seq_len)
-            pre_padded[-len(col):] = col
+            if len(col.shape)==2: # 버그 해결용 if 문
+                
+                l = len(col)
+                col = col.permute(1,0)
+                # print(col.shape)
+                pre_padded[-l:] = col[0]
+            else:
+                pre_padded[-len(col):] = col
             col_list[i].append(pre_padded)
 
         # 연속형
@@ -637,7 +662,7 @@ def get_loaders(args, train, valid):
 def slidding_window(data, args):
     window_size = args.max_seq_len
     stride = args.stride
-
+    
     augmented_datas = []
     for row in data:
         seq_len = len(row[0])
@@ -687,7 +712,9 @@ def shuffle(data, data_size, args):
 
 
 def data_augmentation(data, args):
+    
     if args.window == True:
+        print("Data Augmentation : Slidding Window")
         data = slidding_window(data, args)
 
     return data

@@ -1,4 +1,4 @@
-model : TestLSTMConvATTN    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn,TestLSTMConvATTN}
+model : TestLSTMConvATTN  # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn,TestLSTMConvATTN}
  
 # (비일반화) : base feature만 사용
 # - lstm,lstmattn,bert
@@ -20,15 +20,17 @@ device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
 # file_name: train_data.csv
-file_name : time_train.csv
+# file_name : time_train.csv
+file_name : train_inter_time (1).csv
 # test_file_name: test_data.csv
-test_file_name : time_test.csv
+# test_file_name : time_test.csv
+test_file_name : test_inter_time (1).csv
 
 asset_dir: asset/
 model_dir: models/
 output_dir: output/
 
-max_seq_len: 32
+max_seq_len: 20
 num_workers: 1
 
 ##K-fold params
@@ -39,16 +41,22 @@ split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
 hidden_dim : 128
-n_layers : 2
-n_heads : 2
+n_layers : 6
+n_heads : 4
 drop_out: 0.2
 
+# Augmentation
+window : True # 슬라이딩 윈도우를 사용할 것인지
+stride : 50
+shuffle : True
+shuffle_n : 3
+
 # transformers
-concat_reverse : True
+concat_reverse : False
 
 #train
 n_epochs: 20
-batch_size: 128
+batch_size: 1024
 lr: 0.0001
 clip_grad : 10
 patience : 5

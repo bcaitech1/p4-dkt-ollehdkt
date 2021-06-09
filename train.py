@@ -1,6 +1,6 @@
 import os
 from args import parse_args
-from dkt.dataloader import Preprocess
+from dkt.dataloader import Preprocess,data_augmentation
 from dkt import trainer
 import torch
 from dkt.utils import setSeeds
@@ -28,6 +28,7 @@ def main(args):
     if args.use_kfold:
         trainer.run_kfold(args, train_data)
     else:
+        train_data = data_augmentation(train_data,args)
         train_data, valid_data = preprocess.split_data(train_data, ratio=args.split_ratio, seed=args.seed)
         trainer.run(args, train_data, valid_data)
     
