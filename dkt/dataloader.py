@@ -184,7 +184,7 @@ class MyDKTDataset(torch.utils.data.Dataset):
         seq_len = len(row[0])
         # print(f'row 값 : {len(row)}')
 
-        # test, question, tag, correct, solve_time
+        # test, question, tag, correct, solve_time...etc
         cate_cols = [row[i] for i in range(len(row))]
   
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다

@@ -5,7 +5,7 @@ model : lstm   # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lst
 # (일반화) : 추가한 컬럼까지 범주형으로 사용
 
 wandb :
-    using: False
+    using: True
     project: DKT
 
     ## 자신의 wandb 아이디를 적어주세요
@@ -14,13 +14,13 @@ wandb :
         - baseline
 
 ##main params
-task_name: lstm_low_batch
+task_name: lstm_final_time
 seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
-file_name: train_inter_time.csv
-test_file_name: test_inter_time.csv
+file_name: train_time_fixed.csv
+test_file_name: test_time_fixed.csv
 
 asset_dir: asset/
 model_dir: models/
@@ -43,11 +43,11 @@ drop_out: 0.2
 
 #train
 n_epochs: 15
-batch_size: 256
+batch_size: 64
 lr: 0.0001
 clip_grad : 10
 patience : 5
-log_steps : 25
+log_steps : 50
 split_ratio : 0.8
 
 cont_cols : 1
