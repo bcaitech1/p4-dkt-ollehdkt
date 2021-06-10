@@ -1,0 +1,210 @@
+# 우선 interaction별 grade, grade_level 매겨주기
+
+def grade_test_level(df):
+    df = test_rate(df)
+    df['grade'] = df['testId'].str.slice(start=2, stop=3)
+    df['grade_test_level'] = df.groupby(['grade'])['test_rate'].rank(method='dense', ascending=False)
+    df['grade_test_level'] = df['grade_test_level'].astype(int)
+    return df
+
+grade_test_level = grade_test_level(df)
+grade_test_level
+
+df = df.merge(grade_test_level, on='testId', how='left')
+df['grade'] = df['grade'].astype(int)
+
+
+# 대표 grade값 매기기
+
+def user_grade(df):
+    df_train_grade = df.groupby(['userID','grade'])['grade'].count().reset_index(name='grade_cnt')
+    train_grade_last = df_train_grade.groupby(['userID'], as_index=False).max()  # 가장 많은 cnt개수 
+    train_grade_last['user_grade'] = train_grade_last['grade']
+    all_user_grade = train_grade_last.loc[:,['userID','user_grade']]
+    return all_user_grade
+
+all_user_grade = user_grade(df)
+df = df.merge(all_user_grade,on='userID', how='left')
+
+
+
+#=====================================================================================================================
+
+
+
+import os,gc
+from collections import defaultdict
+from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, precision_recall_curve, roc_curve, accuracy_score
+
+#폴드 개수만큼 user를 쪼갠 목록을 만든다
+def lgbm_oof_split_data_withidx(df):
+    #grade별로 user list 생성 (9개)
+    u_g = df.groupby(['userID','user_grade'])['userID'].count().reset_index(name='cnt')   #user별 grade값
+    users = [[] for _ in range(10)]  #grade개수총 9개
+
+    for id in u_g['userID']:
+        id_grade = int(u_g[u_g['userID'] == id]['user_grade'])  #해당 유저의 grade
+        id_cnt = int(u_g[u_g['userID'] == id]['cnt'])
+        users[id_grade].append((id, id_cnt))
+    
+    # grade별로 sorted
+    for i in range(1,10):
+        user_list = users[i]
+        user_list = sorted(user_list, key =lambda x: x[1], reverse=True)
+        users[i] = user_list
+    
+
+    n_fold = 5
+    random.seed(12)  # default 42
+    user_id_dict=defaultdict(list)
+    user_count_dict=defaultdict(int)
+
+    for i in range(1,10):
+        gul = users[i]           # gul = grade user list
+        random.shuffle(gul)
+        for idx, (id, cnt) in enumerate(gul):
+            f_num=idx%n_fold
+            user_count_dict[f_num] += cnt
+            user_id_dict[f_num].append(id)
+
+    return user_id_dict,user_count_dict
+
+
+
+#dict들을 통해 원하는 폴드의 train/val set을 가져온다
+def get_fold_data(idx,data,user_id_dict,user_count_dict):
+    
+    train = data[data['userID'].isin(user_id_dict[idx]) == False]  # train
+    test = data[data['userID'].isin(user_id_dict[idx])] # validation
+
+    #test데이터셋은 각 유저의 마지막 interaction만 추출
+    test = test[test['userID'] != test['userID'].shift(-1)]  #validation
+    return train, test
+
+
+
+
+#FE를 진행한 전체 train set과 FE를 진행한 전체 test set, featrue 들을 넣어주시면 됩니다
+def make_lgb_user_oof_prediction(train, FEATS,  model_params=None, folds=5 ):  # categorical_features='auto',
+    
+#     train.shape[0]  # train 행 총 개수
+    
+    # fold 생성
+    user_id_dict,user_count_dict = lgbm_oof_split_data_withidx(train)
+    
+    # 마지막 interaction만 추출
+    x_train = train[train['userID'] != train['userID'].shift(-1)]  # 마지막 interaction
+    x_test = x_train[FEATS] # 마지막 interaction의 features 값
+    
+    
+    # 테스트 데이터 예측값을 저장할 변수
+    test_preds = np.zeros(x_test.shape[0])
+    
+    
+    # Out Of Fold Validation 예측 데이터를 저장할 변수 (예측 데이터? 예측값?)
+    y_oof = np.zeros(train.shape[0])
+    
+    
+    # 폴드별 평균 Validation 스코어를 저장할 변수
+    score = 0
+    acc=0
+    
+    # 피처 중요도를 저장할 데이터 프레임 선언
+    fi = pd.DataFrame()
+    fi['feature'] = FEATS
+
+    
+    for fold in range(folds):
+
+        # train index, validation index로 train 데이터를 나눔
+
+
+        train_set,valid_set = get_fold_data(fold, train, user_id_dict, user_count_dict)  #개수 잘 나뉘었다.
+
+
+        x_tr, x_val = train_set[FEATS], valid_set[FEATS]    # 정답 외 feature 값들 (마지막 interaction만 X)
+        y_tr, y_val = train_set['answerCode'], valid_set['answerCode']  # 정답 부분
+    
+        print(f'fold: {fold+1}, x_tr.shape: {x_tr.shape}, x_val.shape: {x_val.shape}')
+
+        # LightGBM 데이터셋 선언
+        dtrain = lgb.Dataset(x_tr, label=y_tr)
+        dvalid = lgb.Dataset(x_val, label=y_val)
+        
+        # LightGBM 모델 훈련
+        model = lgb.train(
+            model_params,
+            dtrain,
+            valid_sets=[dtrain, dvalid], # Validation 성능을 측정할 수 있도록 설정
+            categorical_feature='auto',
+            verbose_eval=100,    
+            num_boost_round=5000,
+        )
+
+        # Validation 데이터 예측
+        val_preds = model.predict(x_val)
+        
+        # Validation index에 예측값 저장 
+#         y_oof[fold] = val_preds
+        
+        # 폴드별 Validation 스코어 측정
+        print(f"Fold {fold + 1} | AUC: {roc_auc_score(y_val, val_preds)}")
+        print('-'*80)
+
+        # score 변수에 폴드별 평균 Validation 스코어 저장
+        score += roc_auc_score(y_val, val_preds) / folds
+        
+        # 테스트 데이터 예측하고 평균해서 저장
+        test_preds += model.predict(x_test) / folds
+        
+        # 폴드별 피처 중요도 저장
+        fi[f'fold_{fold+1}'] = model.feature_importance()
+
+        del x_tr, x_val, y_tr, y_val
+        gc.collect()
+        
+    print(f"\nMean AUC = {score}") # 폴드별 Validation 스코어 출력
+#     print(f"OOF AUC = {roc_auc_score(y, y_oof)}") # Out Of Fold Validation 스코어 출력
+        
+    # 폴드별 피처 중요도 평균값 계산해서 저장 
+    fi_cols = [col for col in fi.columns if 'fold_' in col]
+    fi['importance'] = fi[fi_cols].mean(axis=1)
+    
+    return test_preds, fi
+
+
+
+#======================================================================================================================
+
+
+
+FEATS = ['user_acc','u_test_cnt','test_ans_rate','u_tag_cnt','tag_ans_rate','test_rate','grade','grade_test_level','que_rate','que_num_rate','tag_rate']
+
+model_params = {
+        'objective': 'binary', # 이진 분류
+        'boosting_type': 'gbdt',
+        'metric':'auc',
+        'num_leaves': 227,
+#         'max_bin': 204,
+        # min_data_in_leaf 값을 10-40까지 정수값 중에 사용
+        'min_data_in_leaf': 11,
+        # 피처 샘플링 비율을 0.4-1.0까지 중에 uniform 분포로 사용
+        'feature_fraction': 0.647794747944201,         # optuna 추천 - 0.46948747908887395
+        # 데이터 샘플링 비율을 0.4-1.0까지 중에 uniform 분포로 사용
+        'bagging_fraction': 0.9,
+        # 데이터 샘플링 횟수를 1-7까지 정수값 중에 사용
+        'bagging_freq': 4,   # 1
+#         'n_estimators': 100, # 트리 개수
+        'early_stopping_rounds': 100,
+        # L1 값을 1e-8-10.0까지 로그 uniform 분포로 사용
+        'lambda_l1': 8.755042100872112e-06,       # 0.00010175824628083187
+        # L2 값을 1e-8-10.0까지 로그 uniform 분포로 사용
+        'lambda_l2': 0.0015429233553149078,    # 0.0001150682989588032
+        'seed': 42,
+        'verbose': -1,
+        'n_jobs': -1,    
+    }
+
+
+train_preds, fi = make_lgb_user_oof_prediction(df, FEATS,  model_params, folds=5 )  #categorical_features='auto',
+# print_score(label, pred, prob_thres=0.5)
