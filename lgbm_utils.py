@@ -91,7 +91,7 @@ def make_lgbm_feature(args, df,is_train=True):
     df['test_size'] = df.testId.map(testId2maxlen)
     df['retest'] = df['user_total_ans_cnt'] // df['test_size']
     df['user_test_ans_cnt'] = df['user_total_ans_cnt'] % df['test_size']
-
+    
     # 각 시험지 당 유저의 정확도를 계산
     df['user_test_correct_cnt'] = df.groupby(['userID','testId','retest'])['answerCode'].transform(lambda x: x.cumsum().shift(1))
     df['user_acc'] = df['user_test_correct_cnt']/df['user_test_ans_cnt']

@@ -7,7 +7,7 @@ import random
 from sklearn.preprocessing import LabelEncoder
 import numpy as np
 import torch
-
+from makefeature import *
 from .features import Features as fe
 
 n_test_level_diff=10000
@@ -54,8 +54,11 @@ class Preprocess:
         np.save(le_path, encoder.classes_)
 
     def __preprocessing(self, df, is_train = True):
+        #범주형을 추가하였다면 이곳에 따로 추가, 연속형은 따로 처리할 필요 없음
         cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
-        
+        #범주형 feat개수 conf에 저장
+        self.args.n_cate_feats=len(cate_cols)
+
         if not os.path.exists(self.args.asset_dir):
             os.makedirs(self.args.asset_dir)
             
@@ -91,22 +94,27 @@ class Preprocess:
         if self.args.model=='lgbm':
             return make_lgbm_feature(self.args, df)
         else:
+
             #lgbm 외의 다른 모델들의 fe가 필요하다
             # df = fe.feature_engineering_03(df) # 종호님 피쳐는 먼저 나와야한다.
-     
+            df=make_feature(self.args,df)
             # df = df.merge(fe.feature_engineering_06(pd.DataFrame(df)), left_index=True,right_index=True, how='left')
-            print(f'fe 시 컬럼 확인 : {df.columns}')
+            print(f'FE후 컬럼 확인 : {df.columns}')
             print(df.columns)
 
             print('dataframe 확인')
-            print(df)
+            print(df.loc[:30])
 
-            drop_cols = ['_',"index","point","answer_min_count","answer_max_count","user_count",'sec_time'] # drop할 칼럼
-            for col in drop_cols:
-                if col in df.columns:
-                    df.drop([col],axis=1, inplace=True)
-            print(f"drop 후 : {df.columns}")
+            # drop_cols = ['_',"index","point","answer_min_count","answer_max_count","user_count",'sec_time'] # drop할 칼럼
+            # for col in drop_cols:
+            #     if col in df.columns:
+            #         df.drop([col],axis=1, inplace=True)
+            # print(f"drop 후 : {df.columns}")
 
+            delete_feats=['Timestamp','sec_time']
+            df=df.drop(columns=delete_feats)
+            features = df.columns
+            print(f"drop 후 : {len(features)}개, {features}")
             return df
         
 
@@ -132,21 +140,21 @@ class Preprocess:
         self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
         self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
 
-        # user_correct_answer, user_total_answer,user_acc
-        print('컬럼 확인')
-        print(df.columns)
-
         df = df.sort_values(by=['userID','Timestamp'], axis=0)
         # columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag'] default 컬럼
         columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag',]
         # user_count 기준으로 other feature를 구성
 
         # columns.extend(['test_level_diff','tag_sum','tag_mean','ans_rate'])
-        columns.extend(list(df.columns[col_cnt:]))
+        columns.extend(list(df.columns[col_cnt:col_cnt+self.args.n_cate_feats]))
         self.args.n_other_features = [ int(df[i].nunique()) for i in df.columns[col_cnt:]] # 컬럼 순서 꼭 맞출 것!, 추가 컬럼(feature)의 고윳값 수
-        columns.append('solve_time')
-        ret = ['testId','assessmentItemID','KnowledgeTag','solve_time','answerCode']
-        ret.extend(list(df.columns[col_cnt:]))
+        
+        #나머지 연속형 변수들을 추가함
+        columns.extend(list(df.columns[col_cnt+self.args.n_cate_feats:]))
+        #기존 피처
+        ret = columns[1:].copy()
+        ret.pop(3)
+        ret.append('answerCode')
         print(ret)
         group = df[columns].groupby('userID').apply(
                 lambda r: tuple([r[i].values for i in ret])

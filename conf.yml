@@ -19,8 +19,8 @@ seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
-file_name: real_train_inter_time.csv
-test_file_name: real_test_inter_time.csv
+file_name: train_inter_time.csv
+test_file_name: test_inter_time.csv
 
 asset_dir: asset/
 model_dir: models/
