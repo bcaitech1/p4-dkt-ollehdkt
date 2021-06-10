@@ -93,15 +93,7 @@ class Preprocess:
         else:
             #lgbm 외의 다른 모델들의 fe가 필요하다
             # df = fe.feature_engineering_03(df) # 종호님 피쳐는 먼저 나와야한다.
-            # print(f'{df.columns}')
-            # df = fe.feature_engineering_13(df)
-            # df = fe.feature_engineering_07(df)
-            # df = fe.feature_engineering_08(df)
-            # df = fe.feature_engineering_09(df)
-            # df = fe.feature_engineering_10(df)
-            # df = fe.feature_engineering_11(df)
-            # df = fe.feature_engineering_12(df)
-
+     
             # df = df.merge(fe.feature_engineering_06(pd.DataFrame(df)), left_index=True,right_index=True, how='left')
             print(f'fe 시 컬럼 확인 : {df.columns}')
             print(df.columns)

@@ -15,7 +15,7 @@ import wandb
 
 from .models_architecture import *
 from lgbm_utils import *
-from .new_model import Bert,LSTMATTN
+# from .new_model import Bert,LSTMATTN
 
 import lightgbm as lgb
 from sklearn.metrics import roc_auc_score
@@ -441,9 +441,10 @@ def get_model(args):
     # if args.model.lower() == 'lstmattn': model = LSTMATTN(args)
     if args.model.lower() == 'bert': model = Bert(args)
     if args.model.lower() == 'bilstmattn': model = BiLSTMATTN(args)
-    if args.model.lower() == 'lstmconvattn' or args.model.lower() == 'lstmrobertaattn' or args.model.lower() == 'lstmattn'\
-       or args.model.lower() == 'lstmalbertattn': 
-        model = AutoEncoderLSTMATTN(args)
+    if args.model.lower() == 'lstmattn': model = LSTMATTN(args)
+    # if args.model.lower() == 'lstmconvattn' or args.model.lower() == 'lstmrobertaattn' or args.model.lower() == 'lstmattn'\
+    #    or args.model.lower() == 'lstmalbertattn': 
+    #     model = AutoEncoderLSTMATTN(args)
     if args.model.lower() == 'mylstmconvattn' : model = MyLSTMConvATTN(args)
     if args.model.lower() == 'saint' : model = Saint(args)
     if args.model.lower() == 'lastquery_post': model = LastQuery_Post(args)
@@ -618,7 +619,7 @@ def process_batch(batch, args):
     test = ((test + 1) * mask).to(torch.int64)
     question = ((question + 1) * mask).to(torch.int64)
     tag = ((tag + 1) * mask).to(torch.int64)
-
+    solve_time=((solve_time + 1) * mask).to(torch.float32)
     # gather index
     # 마지막 sequence만 사용하기 위한 index
     gather_index = torch.tensor(np.count_nonzero(mask, axis=1))

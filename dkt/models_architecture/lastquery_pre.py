@@ -27,6 +27,21 @@ from transformers import BertPreTrainedModel
 
 import re
 
+##### PrePadding
+
+class Feed_Forward_block_Pre(nn.Module):
+
+    """
+    out =  Relu( M_out*w1 + b1) *w2 + b2
+    """
+    def __init__(self, dim_ff):
+        super().__init__()
+        self.layer1 = nn.Linear(in_features=dim_ff, out_features=dim_ff)
+        self.layer2 = nn.Linear(in_features=dim_ff, out_features=dim_ff)
+
+    def forward(self,ffn_in):
+        return self.layer2(F.relu(self.layer1(ffn_in)))
+
 class LastQuery_Pre(nn.Module):
     def __init__(self, args):
         super(LastQuery_Pre, self).__init__()
@@ -35,28 +50,29 @@ class LastQuery_Pre(nn.Module):
         self.device = args.device
 
         self.hidden_dim = self.args.hidden_dim
-        
+        self.cont_cols=self.args.cont_cols
         # Embedding 
         # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
         self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
         self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
         self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
         self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
-        self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim)
+        # self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim)
 
 
         # 기존 keetar님 솔루션에서는 Positional Embedding은 사용되지 않습니다
         # 하지만 사용 여부는 자유롭게 결정해주세요 :)
         # self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim)
-        self.n_other_features = self.args.n_other_features
-        print(self.n_other_features)
+        # self.n_other_features = self.args.n_other_features
+        # print(self.n_other_features)
+        self.cont_proj=nn.Linear(self.cont_cols,self.hidden_dim//2)
 
         # encoder combination projection
-        self.comb_proj = nn.Linear((self.hidden_dim//3)*(4+len(self.n_other_features)), self.hidden_dim)
+        self.comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim//2)
 
         # # other feature
-        self.f_cnt = len(self.n_other_features) # feature의 개수
-        self.embedding_other_features = [nn.Embedding(self.n_other_features[i]+1, self.hidden_dim//3) for i in range(self.f_cnt)]
+        # self.f_cnt = len(self.n_other_features) # feature의 개수
+        # self.embedding_other_features = [nn.Embedding(self.n_other_features[i]+1, self.hidden_dim//3) for i in range(self.f_cnt)]
         
         # Encoder
         self.query = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim)
@@ -104,48 +120,41 @@ class LastQuery_Pre(nn.Module):
 
 
     def forward(self, input):
-        # test, question, tag, _, mask, interaction, index = input
-
-        test = input[0]
-        question = input[1]
-        tag = input[2]
-
-        mask = input[4]
-        interaction = input[5]
-        
-        other_features = [input[i] for i in range(6,len(input)-1)]
-        index = input[len(input)-1]
+        test, question,tag, correct, mask, interaction, solve_time, gather_index=input
 
         batch_size = interaction.size(0)
         seq_len = interaction.size(1)
 
+        solve_time=solve_time.unsqueeze(-1) #shape(B,MSL) -> shape(B, MSL, 1)
         # 신나는 embedding
         embed_interaction = self.embedding_interaction(interaction)
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
         embed_tag = self.embedding_tag(tag)
 
+        embed_cont=self.cont_proj(solve_time)
         # dev
-        embed_other_features =[] 
-        
-        for i,e in enumerate(self.embedding_other_features):
-            # print(f'{i}번째 : {e}')
-            # print(f'최댓값(전) : {torch.max(other_features[i])}')
-            # print(f'최솟값(전) : {torch.min(other_features[i])}')
-            embed_other_features.append(e(other_features[i]))
-            # print(f'최댓값(후) : {torch.max(other_features[i])}')
-            # print(f'최솟값(후) : {torch.min(other_features[i])}')
+  
+        # for i,e in enumerate(self.embedding_other_features):
+        #     # print(f'{i}번째 : {e}')
+        #     # print(f'최댓값(전) : {torch.max(other_features[i])}')
+        #     # print(f'최솟값(전) : {torch.min(other_features[i])}')
+        #     embed_other_features.append(e(other_features[i]))
+        #     # print(f'최댓값(후) : {torch.max(other_features[i])}')
+        #     # print(f'최솟값(후) : {torch.min(other_features[i])}')
 
         cat_list = [embed_interaction,
                            embed_test,
                            embed_question,
                            embed_tag,
                            ]
-        cat_list.extend(embed_other_features)
+        # cat_list.extend(embed_other_features)
 
         embed = torch.cat(cat_list, 2)
 
+
         embed = self.comb_proj(embed)
+        embed=torch.cat([embed, embed_cont], 2) #(batch,msl, 128)
 
         # Positional Embedding
         # last query에서는 positional embedding을 하지 않음

@@ -26,6 +26,20 @@ from transformers import BertPreTrainedModel
 
 import re
 
+######## Post Padding
+
+class Feed_Forward_block_Post(nn.Module):
+    """
+    out =  Relu( M_out*w1 + b1) *w2 + b2
+    """
+    def __init__(self, dim_ff):
+        super().__init__()
+        self.layer1 = nn.Linear(in_features=dim_ff, out_features=dim_ff)
+        self.layer2 = nn.Linear(in_features=dim_ff, out_features=dim_ff)
+
+    def forward(self,ffn_in):
+        return self.layer2(F.relu(self.layer1(ffn_in)))
+
 class LastQuery_Post(nn.Module):
     def __init__(self, args):
         super(LastQuery_Post, self).__init__()

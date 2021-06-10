@@ -25,6 +25,26 @@ from transformers.models.albert.configuration_albert import AlbertConfig
 from transformers import BertPreTrainedModel
 
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=1000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        self.scale = nn.Parameter(torch.ones(1))
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(
+            0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.scale * self.pe[:x.size(0), :]
+        return self.dropout(x)
+
+
 class Saint(nn.Module):
     
     def __init__(self, args):
@@ -33,8 +53,10 @@ class Saint(nn.Module):
         self.device = args.device
 
         self.hidden_dim = self.args.hidden_dim
-        self.dropout = self.args.drop_out
-        
+        # self.dropout = self.args.drop_out
+        self.dropout =0.
+
+        self.cont_cols=self.args.cont_cols
         ### Embedding 
         # ENCODER embedding
 
@@ -42,26 +64,28 @@ class Saint(nn.Module):
         self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
         self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
 
-        self.n_other_features = self.args.n_other_features
-        print(self.n_other_features)
+        # self.n_other_features = self.args.n_other_features
+        # print(self.n_other_features)
         
         # encoder combination projection
-        self.enc_comb_proj = nn.Linear((self.hidden_dim//3)*(2+len(self.n_other_features)), self.hidden_dim)
+        self.enc_comb_proj = nn.Linear((self.hidden_dim//3)*3, self.hidden_dim)
 
         # DECODER embedding
         # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
         self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
-        
+   
         # decoder combination projection
-        self.dec_comb_proj = nn.Linear((self.hidden_dim//3)*(3+len(self.n_other_features)), self.hidden_dim)
+        self.dec_comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim//2)
+        #cont feature
+        self.cont_proj=nn.Linear(self.cont_cols,self.hidden_dim//2)
 
         # Positional encoding
         self.pos_encoder = PositionalEncoding(self.hidden_dim, self.dropout, self.args.max_seq_len)
         self.pos_decoder = PositionalEncoding(self.hidden_dim, self.dropout, self.args.max_seq_len)
 
         # # other feature
-        self.f_cnt = len(self.n_other_features) # feature의 개수
-        self.embedding_other_features = [nn.Embedding(self.n_other_features[i]+1, self.hidden_dim//3) for i in range(self.f_cnt)]
+        # self.f_cnt = len(self.n_other_features) # feature의 개수
+        # self.embedding_other_features = [nn.Embedding(self.n_other_features[i]+1, self.hidden_dim//3) for i in range(self.f_cnt)]
         
 
         self.transformer = nn.Transformer(
@@ -94,44 +118,41 @@ class Saint(nn.Module):
 
         # # for i,e in enumerate(input):
         # #     print(f'i 번째 : {e[i].shape}')
-        test = input[0]
-        question = input[1]
-        tag = input[2]
+        test, question,tag, correct, mask, interaction, solve_time, gather_index=input
 
-        mask = input[4]
-        interaction = input[5]
-        
-        other_features = [input[i] for i in range(6,len(input)-1)]
+        # other_features = [input[i] for i in range(6,len(input)-1)]
         
         batch_size = interaction.size(0)
         seq_len = interaction.size(1)
 
+        solve_time=solve_time.unsqueeze(-1) #shape(B,MSL) -> shape(B, MSL, 1)
+        
         
 
         # 신나는 embedding
         # ENCODER
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
-        # embed_tag = self.embedding_tag(tag)
+        embed_tag = self.embedding_tag(tag)
 
         # # dev
         embed_other_features =[] 
         
-        for i,e in enumerate(self.embedding_other_features):
-            # print(f'{i}번째 : {e}')
-            # print(f'최댓값(전) : {torch.max(other_features[i])}')
-            # print(f'최솟값(전) : {torch.min(other_features[i])}')
-            embed_other_features.append(e(other_features[i]))
-            # print(f'최댓값(후) : {torch.max(other_features[i])}')
-            # print(f'최솟값(후) : {torch.min(other_features[i])}')
+        # for i,e in enumerate(self.embedding_other_features):
+        #     # print(f'{i}번째 : {e}')
+        #     # print(f'최댓값(전) : {torch.max(other_features[i])}')
+        #     # print(f'최솟값(전) : {torch.min(other_features[i])}')
+        #     embed_other_features.append(e(other_features[i]))
+        #     # print(f'최댓값(후) : {torch.max(other_features[i])}')
+        #     # print(f'최솟값(후) : {torch.min(other_features[i])}')
         
         cat_list = [
-            # embed_interaction,
-                           embed_test,
-                           embed_question,
-                        #    embed_tag,
+                        # embed_interaction,
+                        embed_test,
+                        embed_question,
+                        embed_tag,
                            ]
-        cat_list.extend(embed_other_features)
+        # cat_list.extend(embed_other_features)
         embed_enc = torch.cat(cat_list, 2)
 
         embed_enc = self.enc_comb_proj(embed_enc)
@@ -139,21 +160,24 @@ class Saint(nn.Module):
         # DECODER     
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
-        # embed_tag = self.embedding_tag(tag)
+        embed_tag = self.embedding_tag(tag)
 
         embed_interaction = self.embedding_interaction(interaction)
+        # embed_interaction=self.embedding_dec_interaction(interaction)
 
+        embed_cont=self.cont_proj(solve_time)
+        
         cat_list = [
-                    
-                           embed_test,
-                           embed_question,
-                        #    embed_tag,
                         embed_interaction,
+                        embed_test,
+                        embed_question,
+                        embed_tag,
                            ]
-        cat_list.extend(embed_other_features)
+        # # cat_list.extend(embed_other_features)
         embed_dec = torch.cat(cat_list, 2)
-
+       
         embed_dec = self.dec_comb_proj(embed_dec)
+        embed_dec=torch.cat([embed_dec, embed_cont], 2) #(batch,msl, 128)
 
         # ATTENTION MASK 생성
         # encoder하고 decoder의 mask는 가로 세로 길이가 모두 동일하여
@@ -169,7 +193,7 @@ class Saint(nn.Module):
             
   
         embed_enc = embed_enc.permute(1, 0, 2)
-        embed_dec = embed_dec.permute(1, 0, 2)
+        embed_dec = embed_dec.permute(1, 0, 2)#shape(batch,msl,hidden_dim) -> shape(msl,batch,hidden_dim)
         
         # Positional encoding
         embed_enc = self.pos_encoder(embed_enc)
