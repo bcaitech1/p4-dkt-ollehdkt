@@ -55,6 +55,7 @@ class Preprocess:
     def __save_labels(self, encoder, name):
         le_path = os.path.join(self.args.asset_dir, name + '_classes.npy') # 해당 클래스는 numpy로 저장
         np.save(le_path, encoder.classes_)
+        
 
     def __preprocessing(self, df, is_train = True):
         
@@ -148,7 +149,7 @@ class Preprocess:
                 # df['hour'] = df.sec_time.apply(lambda x : f'h-{x//3600}')
                 # df['min'] = df.sec_time.apply(lambda x : f'm-{(x%3600)//60}')
                 # df['sec'] = df.sec_time.apply(lambda x : f's-{x%60}')
-                # df['solve_time'] = df['solve_time'].apply(lambda x : f's-{x}')
+                df['solve_time'] = df['solve_time'].apply(lambda x : int(x))
                 pass
 
             print('dataframe 확인')
@@ -170,8 +171,8 @@ class Preprocess:
         col_cnt = len(df.columns)
         df = self.__feature_engineering(df)
 
-        self.args.cate_cols = ['testId','assessmentItemID','KnowledgeTag',] # 실험할 범주형
-        self.args.cont_cols = ['solve_time'] # 실험할 연속형 (user_acc)'solve_time', 'user_acc','user_correct_answer', 'user_total_answer'
+        self.args.cate_cols = ['testId','assessmentItemID','KnowledgeTag','solve_time'] # 실험할 범주형
+        self.args.cont_cols = [] # 실험할 연속형 (user_acc)'solve_time', 'user_acc','user_correct_answer', 'user_total_answer'
         df = self.__preprocessing_v2(df, is_train)
 
         # 유효 컬럼만 거르기 (Optional)
@@ -202,8 +203,6 @@ class Preprocess:
         self.args.n_other_features = [ int(df[i].nunique()) for i in df.columns[col_cnt:]] # 컬럼 순서 꼭 맞출 것!, 추가 컬럼(feature)의 고윳값 수
 
         # 데이터 프레임 재정비
-
-        
         ret = []
         
         print(df)
@@ -232,94 +231,10 @@ class Preprocess:
             )
         
         print(f'group.values->{len(group.values)}')
+
+        del df
+        gc.collect()
         return group.values # 보낼 컬럼 = (범주형)  + (정답 여부) + (연속형)
-        
-    # 기본 범주형 4 + 연속형 조합을 쓰기 위한 load_data_from_file
-    def load_data_from_file_v3(self, file_name, is_train=True):
-        csv_file_path = os.path.join(self.args.data_dir, file_name)
-        print(f'csv_file_path : {csv_file_path}')
-        df = pd.read_csv(csv_file_path)
-        col_cnt = len(df.columns)
-        df = self.__feature_engineering(df)
-        df = self.__preprocessing(df, is_train)
-
-        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용 
-        self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))
-        self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
-        self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
-
-        # user_correct_answer, user_total_answer,user_acc
-        print('컬럼 확인')
-        print(df.columns)
-
-        df = df.sort_values(by=['userID','Timestamp'], axis=0)
-        # columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag'] default 컬럼
-        columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag',]
-        # user_count 기준으로 other feature를 구성
-
-        # columns.extend(['test_level_diff','tag_sum','tag_mean','ans_rate'])
-
-        if self.args.file_name == 'time_train.csv' or self.args.file_name == 'time_test.csv':
-            col_cnt = 6
-
-        columns.extend(list(df.columns[col_cnt:]))
-        self.args.n_other_features = [ int(df[i].nunique()) for i in df.columns[col_cnt:]] # 컬럼 순서 꼭 맞출 것!, 추가 컬럼(feature)의 고윳값 수
-        
-        ret = ['testId','assessmentItemID','KnowledgeTag','answerCode']
-        # 도훈님 데이터를 쓸 때
-        
-        ret.extend(list(df.columns[col_cnt:]))
-        print('보낼 최종컬럼 확인')
-        print(ret)
-        group = df[columns].groupby('userID').apply(
-                lambda r: tuple([r[i].values for i in ret])
-            )
-        
-        len(f'group.values->{len(group.values)}')
-        return group.values
-
-    def load_data_from_file_v2(self, file_name, is_train=True):
-        csv_file_path = os.path.join(self.args.data_dir, file_name)
-        print(f'csv_file_path : {csv_file_path}')
-        df = pd.read_csv(csv_file_path)
-        col_cnt = len(df.columns)
-        df = self.__feature_engineering(df)
-        df = self.__preprocessing(df, is_train)
-
-        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용 
-        self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))
-        self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
-        self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
-
-        # user_correct_answer, user_total_answer,user_acc
-        print('컬럼 확인')
-        print(df.columns)
-
-        df = df.sort_values(by=['userID','Timestamp'], axis=0)
-        # columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag'] default 컬럼
-        columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag',]
-        # user_count 기준으로 other feature를 구성
-
-        
-        # Optional
-        # if self.args.file_name == 'time_train.csv' or self.args.file == 'time_test.csv':
-        #     col_cnt = 6
-
-        columns.extend(list(df.columns[col_cnt:]))
-        self.args.n_other_features = [ int(df[i].nunique()) for i in df.columns[col_cnt:]] # 컬럼 순서 꼭 맞출 것!, 추가 컬럼(feature)의 고윳값 수
-        
-        ret = ['testId','assessmentItemID','KnowledgeTag','answerCode']
-        # 도훈님 데이터를 쓸 때
-        
-        ret.extend(list(df.columns[col_cnt:]))
-        print('보낼 최종컬럼 확인')
-        print(ret)
-        group = df[columns].groupby('userID').apply(
-                lambda r: tuple([r[i].values for i in ret])
-            )
-        del df # df는 더이상 쓰이지 않으므로 날림
-        len(f'group.values->{len(group.values)}')
-        return group.values
 
 
     def load_data_from_file(self, file_name, is_train=True):
@@ -536,7 +451,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 # 범주형, 연속형
 def collate_v2(batch):
-    # batch 순서 : (범주형 ),answer,(마스크 1개),(연속형)
+    # batch 순서 : (범주형),answerCode,(마스크 1개),(연속형)
     # col_n = len(batch[0])
     # for _,i in enumerate(batch):
     #     print(f'{_}번째 batch')
@@ -559,7 +474,6 @@ def collate_v2(batch):
     #     print(i)
     #     print('============================================================')
     # batch의 값들을 각 column끼리 그룹화
-    # 4+1 = 범주형 4개 + 마스크 1개
     for row in batch:
 
         # 범주형, answerCode, mask
@@ -631,10 +545,14 @@ def get_loaders(args, train, valid):
 
     pin_memory = True
     train_loader, valid_loader = None, None
+
+    old_models = ['lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn']
+    recent_models = ['TestLSTNConvATTN','gsaint']
     
     if train is not None:
-        # trainset = DKTDataset(train, args)
-        # trainset = DevDKTDataset(train,args)
+
+        # trainset = DKTDataset(train, args) # default
+        
         trainset = TestDKTDataset(train,args) # 범주형, 연속형
         # trainset = MyDKTDataset(train,args)
         if isinstance(trainset,TestDKTDataset):
@@ -644,11 +562,10 @@ def get_loaders(args, train, valid):
             train_loader = torch.utils.data.DataLoader(trainset, num_workers=args.num_workers, shuffle=True,
                             batch_size=args.batch_size, pin_memory=pin_memory, collate_fn=collate)
     if valid is not None:
-        # valset = DKTDataset(valid, args)
-        # valset = DevDKTDataset(valid,args)
+        # valset = DKTDataset(valid, args) # default
+        
         valset = TestDKTDataset(valid,args) # 범주형, 연속형
         # valset = MyDKTDataset(valid,args)
-        # print('inference gogo')
         if isinstance(valset,TestDKTDataset):
             valid_loader = torch.utils.data.DataLoader(valset, num_workers=args.num_workers, shuffle=False,
                             batch_size=args.batch_size, pin_memory=pin_memory, collate_fn=collate_v2)
@@ -696,7 +613,8 @@ def slidding_window(data, args):
                     window_data.append(col[-window_size:])
                 augmented_datas.append(tuple(window_data))
 
-
+    del data
+    gc.collect()
     return augmented_datas
 
 def shuffle(data, data_size, args):
@@ -719,3 +637,91 @@ def data_augmentation(data, args):
 
     return data
 
+######################################### Deprecated #################################################################
+
+# 기본 범주형 4 + 연속형 조합을 쓰기 위한 load_data_from_file
+    def load_data_from_file_v3(self, file_name, is_train=True):
+        csv_file_path = os.path.join(self.args.data_dir, file_name)
+        print(f'csv_file_path : {csv_file_path}')
+        df = pd.read_csv(csv_file_path)
+        col_cnt = len(df.columns)
+        df = self.__feature_engineering(df)
+        df = self.__preprocessing(df, is_train)
+
+        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용 
+        self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))
+        self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
+        self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
+
+        # user_correct_answer, user_total_answer,user_acc
+        print('컬럼 확인')
+        print(df.columns)
+
+        df = df.sort_values(by=['userID','Timestamp'], axis=0)
+        # columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag'] default 컬럼
+        columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag',]
+        # user_count 기준으로 other feature를 구성
+
+        # columns.extend(['test_level_diff','tag_sum','tag_mean','ans_rate'])
+
+        if self.args.file_name == 'time_train.csv' or self.args.file_name == 'time_test.csv':
+            col_cnt = 6
+
+        columns.extend(list(df.columns[col_cnt:]))
+        self.args.n_other_features = [ int(df[i].nunique()) for i in df.columns[col_cnt:]] # 컬럼 순서 꼭 맞출 것!, 추가 컬럼(feature)의 고윳값 수
+        
+        ret = ['testId','assessmentItemID','KnowledgeTag','answerCode']
+        # 도훈님 데이터를 쓸 때
+        
+        ret.extend(list(df.columns[col_cnt:]))
+        print('보낼 최종컬럼 확인')
+        print(ret)
+        group = df[columns].groupby('userID').apply(
+                lambda r: tuple([r[i].values for i in ret])
+            )
+        
+        len(f'group.values->{len(group.values)}')
+        return group.values
+
+    def load_data_from_file_v2(self, file_name, is_train=True):
+        csv_file_path = os.path.join(self.args.data_dir, file_name)
+        print(f'csv_file_path : {csv_file_path}')
+        df = pd.read_csv(csv_file_path)
+        col_cnt = len(df.columns)
+        df = self.__feature_engineering(df)
+        df = self.__preprocessing(df, is_train)
+
+        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용 
+        self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))
+        self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
+        self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
+
+        # user_correct_answer, user_total_answer,user_acc
+        print('컬럼 확인')
+        print(df.columns)
+
+        df = df.sort_values(by=['userID','Timestamp'], axis=0)
+        # columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag'] default 컬럼
+        columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag',]
+        # user_count 기준으로 other feature를 구성
+
+        
+        # Optional
+        # if self.args.file_name == 'time_train.csv' or self.args.file == 'time_test.csv':
+        #     col_cnt = 6
+
+        columns.extend(list(df.columns[col_cnt:]))
+        self.args.n_other_features = [ int(df[i].nunique()) for i in df.columns[col_cnt:]] # 컬럼 순서 꼭 맞출 것!, 추가 컬럼(feature)의 고윳값 수
+        
+        ret = ['testId','assessmentItemID','KnowledgeTag','answerCode']
+        # 도훈님 데이터를 쓸 때
+        
+        ret.extend(list(df.columns[col_cnt:]))
+        print('보낼 최종컬럼 확인')
+        print(ret)
+        group = df[columns].groupby('userID').apply(
+                lambda r: tuple([r[i].values for i in ret])
+            )
+        del df # df는 더이상 쓰이지 않으므로 날림
+        len(f'group.values->{len(group.values)}')
+        return group.values

@@ -14,6 +14,7 @@ from .metric import get_metric
 import wandb
 
 from .model import *
+from .new_model import *
 from lgbm_utils import *
 from .new_model import Bert,LSTMATTN
 
@@ -248,7 +249,7 @@ def train(train_loader, model, optimizer, args):
             # print('process_batch_v2 사용')
             # input = process_batch_v3(batch, args)
             input = process_batch_v2(batch, args)
-        elif isinstance(model,TestLSTMConvATTN) or isinstance(model,GeneralizedSaint):
+        elif isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint):
             # print('process_batch_v3 사용')
             # print(type(batch))
             input = process_batch_v3(batch,args)
@@ -304,7 +305,7 @@ def validate(valid_loader, model, args):
              or isinstance(model, TfixupSaint) or isinstance(model, AutoEncoderLSTMATTN):
             input = process_batch_v2(batch, args)
             # input = process_batch_v3(batch, args)
-        elif isinstance(model,TestLSTMConvATTN) or isinstance(model,GeneralizedSaint):
+        elif isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint):
             # print('process_batch_v3 사용 for validate')
             input = process_batch_v3(batch, args)
         else:
@@ -357,7 +358,7 @@ def inference(args, test_data):
     for step, batch in enumerate(test_loader):
         # input = process_batch(batch, args)
         # input = process_batch_test(batch,args)
-        if isinstance(model,TestLSTMConvATTN) or isinstance(model,GeneralizedSaint):
+        if isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint):
             input = process_batch_v3(batch,args)
         else:
             input = process_batch_v2(batch,args)
@@ -449,13 +450,13 @@ def get_model(args):
     if args.model.lower() == 'lstmconvattn' or args.model.lower() == 'lstmrobertaattn' or args.model.lower() == 'lstmattn'\
        or args.model.lower() == 'lstmalbertattn': 
         model = AutoEncoderLSTMATTN(args)
-    if args.model.lower() == 'mylstmconvattn' : model = MyLSTMConvATTN(args)
+    # if args.model.lower() == 'mylstmconvattn' : model = MyLSTMConvATTN(args)
     if args.model.lower() == 'saint' : model = Saint(args)
     if args.model.lower() == 'lastquery_post': model = LastQuery_Post(args)
     if args.model.lower() == 'lastquery_pre' : model = LastQuery_Pre(args)
-    if args.model.lower() == 'lastquery_post_test' : model = LastQuery_Post_TEST(args) # 개발중(deprecated)
+    # if args.model.lower() == 'lastquery_post_test' : model = LastQuery_Post_TEST(args) # 개발중(deprecated)
     if args.model.lower() == 'tfixsaint' : model = TfixupSaint(args) # tfix-up을 적용한 Saint
-    if args.model.lower() == 'testlstmconvattn' : model = TestLSTMConvATTN(args)
+    if args.model.lower() == 'generalizedlstmconvattn' or args.model.lower() == 'glstmconvattn' : model = GeneralizedLSTMConvATTN(args)
     if args.model.lower() == 'generalizedsaint' or args.model.lower() == 'gsaint': model = GeneralizedSaint(args)
 
     model.to(args.device)
