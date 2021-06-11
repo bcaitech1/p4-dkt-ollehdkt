@@ -480,16 +480,18 @@ def get_model(args):
 
 # 배치 전처리 일반화
 def process_batch_v2(batch, args):
+    print('-'*80)
+    print("process_batch_v2 실행중")
     # batch : load_data_from 에서 return 시킬 feature(컬럼)
-    # test, question,tag,correct, mask = batch
+    # test, question,tag,등등 cate형, 연속형피처, answercode, mask = batch
     # 규칙 : mask는 항상 맨 뒤임
     # print(type(batch))
-    test = batch[0]
-    question = batch[1]
-    tag = batch[2]
-    correct = batch[3]
-    solve_time=batch[-2]
-    mask = batch[len(batch)-1]
+    cate_cols=batch[:len(args.cate_cols)-1] #userID 빼고
+    print("cate_cols",cate_cols)
+    cont_cols=batch[len(args.cate_cols)-1:-2] #answercode, mask 빼고
+    print("cont_cols",cont_cols)
+    correct = batch[-2]
+    mask = batch[-1]
     # change to float
     mask = mask.type(torch.FloatTensor)
     correct = correct.type(torch.FloatTensor)
@@ -502,113 +504,31 @@ def process_batch_v2(batch, args):
     interaction_mask = mask.roll(shifts=1, dims=1)
     interaction_mask[:, 0] = 0
     interaction = (interaction * interaction_mask).to(torch.int64)
-    
-    #  test_id, question_id, tag
-    test = ((test + 1) * mask).to(torch.int64)
-    question = ((question + 1) * mask).to(torch.int64)
-    tag = ((tag + 1) * mask).to(torch.int64)
 
-    new_batch = [None for i in range((len(batch)-5))]
-    # 기타 features
-    for i in range(4,len(batch)-1):
-        new_batch[i-4] = ((batch[i]+1)*mask).to(torch.int64)
+    # cate features masking
+    for i in range(len(args.cate_feats)-1):
+        batch[i] = ((batch[i]+1)*mask).to(torch.int64)
+    # cont features masking
+    for j in range(len(args.cate_feats)-1,len(batch)-2):
+        batch[j] = ((batch[j]+1)*mask).to(torch.int64)
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
     gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
     gather_index = gather_index.view(-1, 1) - 1
 
-    # device memory로 이동
-    m=0
-    test = test.to(args.device)
-    m=max(torch.max(test),m)
-    question = question.to(args.device)
-    m=max(torch.max(question),m)
+    # feature들 device에 load
+    for i in range(len(batch)):
+        batch[i] = batch[i].to(args.device)
 
-    tag = tag.to(args.device)
-    m=max(torch.max(tag),m)
-    correct = correct.to(args.device)
-    m=max(torch.max(correct),m)
-    mask = mask.to(args.device)
-    m=max(torch.max(mask),m)
-
-    interaction = interaction.to(args.device)
-    m=max(torch.max(interaction),m)
-    gather_index = gather_index.to(args.device)
-
-    # 기타 feature를 args의 device에 load
-    for i in range(len(new_batch)):
-        new_batch[i] = new_batch[i].to(args.device)
-        m=max(torch.max(new_batch[i]),m)
-
-    ret = [test,question,tag,correct,mask,interaction]
-    ret.extend(new_batch)
+    #userID, answerCode 제거, answer는 이미 get_target에서 갖고갔음
+    ret = batch[:len(args.cate_feats)-1]+batch[len(args.cate_feats)-1:len(batch)-2]
+    ret.append(interaction)
+    ret.append(mask)
     ret.append(gather_index)
+    print("모델로 넘기는 ret 출력",ret)
     # print(f"최댓값 : {m}")
-    return tuple(ret)
-
-# 배치 전처리 테스트
-def process_batch_test(batch, args):
-    # if len(batch)==6:
-    #     test, question, tag, correct, test_level_diff, mask = batch
-    # else:
-    #     test, question, tag, correct, mask = batch
-    test, question,tag,correct, test_level_diff, tag_mean,tag_sum,ans_rate,mask = batch
-    # test, question, tag, correct, mask = batch # base
-    
-    # print(type(batch))
-    
-    # change to float
-    mask = mask.type(torch.FloatTensor)
-    correct = correct.type(torch.FloatTensor)
-
-    #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
-    #    saint의 경우 decoder에 들어가는 input이다
-    interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
-    interaction = interaction.roll(shifts=1, dims=1)
-    # interaction[:, 0] = 0 # set padding index to the first sequence
-    interaction_mask = mask.roll(shifts=1, dims=1)
-    interaction_mask[:, 0] = 0
-    interaction = (interaction * interaction_mask).to(torch.int64)
-    # print(interaction)
-    # exit()
-    #  test_id, question_id, tag
-    test = ((test + 1) * mask).to(torch.int64)
-    question = ((question + 1) * mask).to(torch.int64)
-    tag = ((tag + 1) * mask).to(torch.int64)
-    
-    test_level_diff = ((test_level_diff+1) * mask).to(torch.int64)
-
-    tag_mean = ((tag_mean+1) * mask).to(torch.int64)
-    tag_sum = ((tag_sum+1) * mask).to(torch.int64)
-    ans_rate = ((ans_rate+1) * mask).to(torch.int64)
-
-    # gather index
-    # 마지막 sequence만 사용하기 위한 index
-    gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
-    gather_index = gather_index.view(-1, 1) - 1
-
-
-    # device memory로 이동
-
-    test = test.to(args.device)
-    question = question.to(args.device)
-
-
-    tag = tag.to(args.device)
-    correct = correct.to(args.device)
-    mask = mask.to(args.device)
-
-    interaction = interaction.to(args.device)
-    gather_index = gather_index.to(args.device)
-
-    test_level_diff = test_level_diff.to(args.device)
-    tag_mean = tag_mean.to(args.device)
-    tag_sum = tag_sum.to(args.device)
-    ans_rate = ans_rate.to(args.device)
-
-    return (test, question,
-    tag, correct, mask, interaction, test_level_diff,tag_mean,tag_sum,ans_rate, gather_index)
+    return tuple(ret) #tuple(cate + cont + interaction + mask + gather_index)
 
 # 배치 전처리(기본 feature만 쓸 때, baseline)
 def process_batch(batch, args):
@@ -708,7 +628,7 @@ def load_model_kfold(args, fold):
     print("Loading Model from:", model_path, "...Finished.")
     return model
 
-def get_target(datas):
+def get_target(datas): #처리하기 전에 get_data_from_file 에서 맨마지막 answer이므로 바뀔일 없음
     targets = []
     for data in datas:
         targets.append(data[-1][-1])

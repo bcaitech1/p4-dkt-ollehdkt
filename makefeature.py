@@ -17,8 +17,10 @@ from sklearn.impute import SimpleImputer
 import numpy as np
 from collections import defaultdict
 
-def make_feature(self.args,df):
+from lgbm_utils import *
 
+def make_feature(self.args,df):
+    
     group_list=['userID']
     uid_agg_dict={
         'solve_time' :['mean','std','skew'],

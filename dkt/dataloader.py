@@ -54,11 +54,24 @@ class Preprocess:
         np.save(le_path, encoder.classes_)
 
     def __preprocessing(self, df, is_train = True):
-        #범주형을 추가하였다면 이곳에 따로 추가, 연속형은 따로 처리할 필요 없음
-        cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
-        #범주형 feat개수 conf에 저장
-        self.args.n_cate_feats=len(cate_cols)
+        #범주형 column 골라내기
+        cate_cols=[]
+        cont_cols=[]
+        for column in df.columns:
+            if df[column].dtype==object:
+                cate_cols.append(column)
+            else :
+                cont_cols.append(column)
+                
 
+        #feat이름 배열 conf에 저장 
+        self.args.cate_feats=cate_cols
+        self.args.cont_feats=cont_cols
+
+        
+        print(f'범주형의 개수는 {len(cate_cols)}개 이고, 연속형의 개수는 {len(cont_cols)개 입니다}')
+        print(f'범주형 {cate_cols}')
+        print(f'연속형 {cont_cols}')
         if not os.path.exists(self.args.asset_dir):
             os.makedirs(self.args.asset_dir)
             
@@ -75,17 +88,15 @@ class Preprocess:
                 
                 df[col] = df[col].apply(lambda x: x if x in le.classes_ else 'unknown')
 
-            #모든 컬럼이 범주형이라고 가정
-            df[col]= df[col].astype(str)
-            test = le.transform(df[col])
-            df[col] = test
             
+        #cate feat들의 이름 / 고유값 개수를 dict로 conf에 저장
+        self.cate_feat_dict=dict(zip(cate_cols,[len(df[col].unique()) for col in cate_cols]))
 
-        def convert_time(s):
-            timestamp = time.mktime(datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timetuple())
-            return int(timestamp)
+        # def convert_time(s):
+        #     timestamp = time.mktime(datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timetuple())
+        #     return int(timestamp)
 
-        df['Timestamp'] = df['Timestamp'].apply(convert_time)
+        # df['Timestamp'] = df['Timestamp'].apply(convert_time)
         
         return df
 
@@ -103,7 +114,7 @@ class Preprocess:
             print(df.columns)
 
             print('dataframe 확인')
-            print(df.loc[:30])
+            print(df.loc[:3])
 
             # drop_cols = ['_',"index","point","answer_min_count","answer_max_count","user_count",'sec_time'] # drop할 칼럼
             # for col in drop_cols:
@@ -130,32 +141,25 @@ class Preprocess:
             df.sort_values(by=['userID','Timestamp'], inplace=True)
             return df
 
+        #둘은 int로 돼있어서 cate_col로 분류되도록 미리 형변환
+        df['userID']=df['userID'].astype(str)
+        df['KnowledgeTag']=df['KnowledgeTag'].astype(str)
         
+
         col_cnt = len(df.columns)
         df = self.__feature_engineering(df)
         df = self.__preprocessing(df, is_train)
 
-        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용 
-        self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))
-        self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
-        self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
+        #column은 cate feats 다음에 cont_feats가 오며 cate feats의 처음은 userid, cont_feats의 처음 피처는 answerCode임
+        columns=self.args.cate_feats+self.args.cont_feats
 
-        df = df.sort_values(by=['userID','Timestamp'], axis=0)
-        # columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag'] default 컬럼
-        columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag',]
-        # user_count 기준으로 other feature를 구성
-
-        # columns.extend(['test_level_diff','tag_sum','tag_mean','ans_rate'])
-        columns.extend(list(df.columns[col_cnt:col_cnt+self.args.n_cate_feats]))
-        self.args.n_other_features = [ int(df[i].nunique()) for i in df.columns[col_cnt:]] # 컬럼 순서 꼭 맞출 것!, 추가 컬럼(feature)의 고윳값 수
-        
-        #나머지 연속형 변수들을 추가함
-        columns.extend(list(df.columns[col_cnt+self.args.n_cate_feats:]))
-        #기존 피처
+        #기존 피처 유저제외시킴
         ret = columns[1:].copy()
-        ret.pop(3)
+        #연속형 첫번째 순서인 answerCode를 빼서
+        ret.pop(len(self.args.cate_feats))
+        #맨뒤로 붙여줌
         ret.append('answerCode')
-        print(ret)
+        print("answercode의 순서 뒤로 변경",ret)
         group = df[columns].groupby('userID').apply(
                 lambda r: tuple([r[i].values for i in ret])
             )
@@ -185,25 +189,25 @@ class MyDKTDataset(torch.utils.data.Dataset):
         # print(f'row 값 : {len(row)}')
 
         # test, question, tag, correct, solve_time...etc
-        cate_cols = [row[i] for i in range(len(row))]
+        columns = [row[i] for i in range(len(row))]
   
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
         if seq_len > self.args.max_seq_len:
-            for i, col in enumerate(cate_cols):
-                cate_cols[i] = col[-self.args.max_seq_len:]
+            for i, col in enumerate(columns):
+                columns[i] = col[-self.args.max_seq_len:]
             mask = np.ones(self.args.max_seq_len, dtype=np.int16)
         else:
             mask = np.zeros(self.args.max_seq_len, dtype=np.int16)
             mask[-seq_len:] = 1
 
         # mask도 columns 목록에 포함시킴
-        cate_cols.append(mask)
+        columns.append(mask)
 
         # np.array -> torch.tensor 형변환
-        for i, col in enumerate(cate_cols):
-            cate_cols[i] = torch.tensor(col)
+        for i, col in enumerate(columns):
+            columns[i] = torch.tensor(col)
 
-        return cate_cols
+        return columns
 
     def __len__(self):
         return len(self.data)

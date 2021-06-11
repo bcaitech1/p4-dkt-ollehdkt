@@ -23,20 +23,21 @@ class LSTM(nn.Module):
         self.hidden_dim = self.args.hidden_dim
         self.n_layers = self.args.n_layers
         self.cont_cols=1
-
-        # Embedding 
+        #userID때문에 하나 뺌
+        cate_len=len(args.cate_feats)-1
+        #answerCode 때문에 하나 뺌
+        cont_len=len(args.cont_feats)-1
+        # cate Embedding 
+        self.cate_embedding_list = nn.ModuleList([nn.Linear(max_val+1, (self.hidden_dim//2)//cate_len) for max_val in list(args.cate_feat_dict.keys())[1:]]) 
+        # cont Embedding
+        self.cont_embedding_list = nn.ModuleList([nn.Linear(1, (self.hidden_dim//2)//cont_len) for _ in args.cont_feats[1:]]) 
         # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
-        self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
-        self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
-        self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
-        self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
-
+        self.embedding_interaction = nn.Embedding(3, (self.hidden_dim//2)//cate_len)
+        # self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
+        # self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
+        # self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
+        #shape(batch,msl,feats)
         #continuous
-        self.cont_proj=nn.Linear(self.cont_cols,self.hidden_dim//2)
-
-        # embedding combination projection
-        self.comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim//2)
-
         self.lstm = nn.LSTM(self.hidden_dim,
                             self.hidden_dim,
                             self.n_layers,
@@ -63,19 +64,30 @@ class LSTM(nn.Module):
         return (h, c)
 
     def forward(self, input):
-        test, question,tag, correct, mask, interaction, solve_time, gather_index=input
+        # cate + cont + interaction + mask + gather_index= input
 
-        # test, question, tag, _, mask,interaction,solve_time, _ = input
-        
+        #userID가 빠졌으므로 -1
+        cate_feats=input[:len(self.args.cate_feats)-1]
+        #answercode가 없으므로 -1
+        cont_feats=input[len(self.args.cont_feats)-1:-3]
+
+        interaction=input[-3]
+        mask=input[-2]
+        gather_index=input[-1]
+
         batch_size = interaction.size(0)
+        # cate Embedding
+
 
         # Embedding
         solve_time=solve_time.unsqueeze(-1)
         embed_interaction = self.embedding_interaction(interaction)
-        embed_test = self.embedding_test(test)
-        embed_question = self.embedding_question(question)
-        embed_tag = self.embedding_tag(tag)
+
+        list(args.cate_feat_dict.keys())[1:]]
+
         
+        for i, l in enumerate(list(self.args.cate_feat_dict.keys())[1:]): 
+            cate_feats_embed = torch.cat([self.linears[i](x) + l(x)  
         embed_cont=self.cont_proj(solve_time)
         # print(embed_cont.shape)
         # print("-"*80)
