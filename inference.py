@@ -28,9 +28,9 @@ if __name__ == "__main__":
     # parser.add_argument('-c', '--conf', default='/opt/ml/git/p4-dkt-ollehdkt/conf.yml', help='wrtie configuration file root.')
     # parser.add_argument('-t', '--task', default='', help='wrtie task_dir root.')
     
-    term_args = parser.parse_args()
+    # term_args = parser.parse_args()
 
-    with open(term_args.conf) as f:
+    with open('/opt/ml/code/conf.yml') as f:
         cf = yaml.load(f, Loader=yaml.FullLoader)
     args = AttrDict(cf)
     # args = parse_args(mode='train')

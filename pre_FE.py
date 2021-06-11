@@ -70,3 +70,25 @@ def make_timecv(df):
         answer=pd.concat([answer,total_user], ignore_index=False)
     answer.sort_values(by=['userID','Timestamp'], inplace=True)
     return answer
+
+#문제별 풀이시간 평균을 구하는 함수
+def get_time_avg_dict():
+    csv_file_path = '/opt/ml/input/data/train_dataset/train_time_fixed.csv'
+    df = pd.read_csv(csv_file_path) 
+    csv_file_path = '/opt/ml/input/data/train_dataset/test_time_fixed.csv'
+    tdf = pd.read_csv(csv_file_path) 
+    #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
+    # df.sort_values(by=['userID','Timestamp'], inplace=True)
+    total_df=pd.concat([df,tdf],ignore_index=True)
+    time_mean_df=total_df.groupby('assessmentItemID').agg({'solve_time':'mean'}).reset_index(drop=False)
+    item_time_dict=dict(zip(time_mean_df['assessmentItemID'],time_mean_df['solve_time']))
+    return item_time_dict
+
+def make_wrongtime_right(df,item_time_dict):
+    def maket(t):
+        time=t['solve_time']
+        if time>3600 or time<0:
+            t['solve_time']=item_time_dict[t['assessmentItemID']]
+        return t['solve_time']
+    df['solve_time']=df.apply(maket,axis=1)
+    return df
