@@ -67,9 +67,9 @@ class Preprocess:
         #feat이름 배열 conf에 저장 
         self.args.cate_feats=cate_cols
         self.args.cont_feats=cont_cols
-
         
-        print(f'범주형의 개수는 {len(cate_cols)}개 이고, 연속형의 개수는 {len(cont_cols)개 입니다}')
+        
+        print(f"범주형의 개수는 {len(cate_cols)}개 이고, 연속형의 개수는 {len(cont_cols)}개 입니다")
         print(f'범주형 {cate_cols}')
         print(f'연속형 {cont_cols}')
         if not os.path.exists(self.args.asset_dir):
@@ -90,13 +90,7 @@ class Preprocess:
 
             
         #cate feat들의 이름 / 고유값 개수를 dict로 conf에 저장
-        self.cate_feat_dict=dict(zip(cate_cols,[len(df[col].unique()) for col in cate_cols]))
-
-        # def convert_time(s):
-        #     timestamp = time.mktime(datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timetuple())
-        #     return int(timestamp)
-
-        # df['Timestamp'] = df['Timestamp'].apply(convert_time)
+        self.args.cate_feat_dict=dict(zip(cate_cols,[len(df[col].unique()) for col in cate_cols]))
         
         return df
 
@@ -151,12 +145,12 @@ class Preprocess:
         df = self.__preprocessing(df, is_train)
 
         #column은 cate feats 다음에 cont_feats가 오며 cate feats의 처음은 userid, cont_feats의 처음 피처는 answerCode임
-        columns=self.args.cate_feats+self.args.cont_feats
-
+        columns=self.args['cate_feats']+self.args['cont_feats']
+        print(columns)
         #기존 피처 유저제외시킴
-        ret = columns[1:].copy()
+        ret = columns[1:]
         #연속형 첫번째 순서인 answerCode를 빼서
-        ret.pop(len(self.args.cate_feats))
+        ret.pop(len(self.args.cate_feats)-1)
         #맨뒤로 붙여줌
         ret.append('answerCode')
         print("answercode의 순서 뒤로 변경",ret)
@@ -205,6 +199,9 @@ class MyDKTDataset(torch.utils.data.Dataset):
 
         # np.array -> torch.tensor 형변환
         for i, col in enumerate(columns):
+            print(i,"번째가 문제다")
+            print(len(col))
+            print(col.dtype)
             columns[i] = torch.tensor(col)
 
         return columns

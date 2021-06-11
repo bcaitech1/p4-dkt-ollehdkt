@@ -5,7 +5,7 @@ model : lstm   # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lst
 # (일반화) : 추가한 컬럼까지 범주형으로 사용
 
 wandb :
-    using: True
+    using: False
     project: DKT
 
     ## 자신의 wandb 아이디를 적어주세요
@@ -14,7 +14,7 @@ wandb :
         - baseline
 
 ##main params
-task_name: lstm_final_time
+task_name: test
 seed: 42
 device: cuda
 
@@ -36,7 +36,7 @@ n_fold : 5
 split_by_user : True #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
-hidden_dim : 128
+hidden_dim : 256
 n_layers : 2
 n_heads : 2
 drop_out: 0.2

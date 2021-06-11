@@ -19,7 +19,7 @@ from collections import defaultdict
 
 from lgbm_utils import *
 
-def make_feature(self.args,df):
+def make_feature(args,df):
     
     group_list=['userID']
     uid_agg_dict={

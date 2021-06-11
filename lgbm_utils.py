@@ -16,7 +16,7 @@ from sklearn.model_selection import train_test_split, cross_val_score, KFold, St
 from sklearn.impute import SimpleImputer
 import numpy as np
 from collections import defaultdict
-from metric.py import *
+from dkt import metric
 
 def make_sharing_feature(args):
     """[use train+test(except last row) get pre_processed feature]

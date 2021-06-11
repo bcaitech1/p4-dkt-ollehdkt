@@ -70,7 +70,7 @@ def run(args, train_data, valid_data):
         print(f"Start Training: Epoch {epoch + 1}")
         
         ### TRAIN
-        train_auc, train_acc, train_precision,train_recall,train_f1 train_loss = train(train_loader, model, optimizer, args)
+        train_auc, train_acc, train_precision,train_recall,train_f1, train_loss = train(train_loader, model, optimizer, args)
     
         ### VALID
         auc, acc,precision,recall,f1, preds , _ = validate(valid_loader, model, args)
@@ -213,7 +213,7 @@ def run_kfold(args, train_data):
             print(f"Start Training: Epoch {epoch + 1}")
             
             ### TRAIN
-            train_auc, train_acc, train_precision,train_recall,train_f1 train_loss = train(train_loader, model, optimizer, args)
+            train_auc, train_acc, train_precision,train_recall,train_f1, train_loss = train(train_loader, model, optimizer, args)
         
             ### VALID
             auc, acc,precision,recall,f1, preds , _ = validate(valid_loader, model, args)
