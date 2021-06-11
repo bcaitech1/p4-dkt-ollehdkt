@@ -35,9 +35,9 @@ def run(args, train_data, valid_data):
     #lgbm은 학습과 추론을 함께함
     if args.model=='lgbm':
         print("k-fold를 사용하지 않습니다","-"*80)
-        model,auc,acc=lgbm_train(args,train_data,valid_data)
+        model,auc,acc, precision, recall, f1=lgbm_train(args,train_data,valid_data)
         if args.wandb.using:
-            wandb.log({"valid_auc":auc, "valid_acc":acc})
+            wandb.log({"valid_auc": train_auc, "valid_acc":train_acc,"valid_precision":precision, "valid_recall":recall, "valid_f1": f1})
         #추론준비
         csv_file_path = os.path.join(args.data_dir, args.test_file_name)
         test_df = pd.read_csv(csv_file_path)#, nrows=100000)
@@ -60,25 +60,33 @@ def run(args, train_data, valid_data):
     scheduler = get_scheduler(optimizer, args)
 
     best_auc = -1
-    accuracy = -1
+    best_accuracy = -1
+    best_precision=-1
+    best_recall=-1
+    best_f1=-1
     early_stopping_counter = 0
     for epoch in range(args.n_epochs):
 
         print(f"Start Training: Epoch {epoch + 1}")
         
         ### TRAIN
-        train_auc, train_acc, train_loss = train(train_loader, model, optimizer, args)
-        
+        train_auc, train_acc, train_precision,train_recall,train_f1 train_loss = train(train_loader, model, optimizer, args)
+    
         ### VALID
-        auc, acc,_ , _ = validate(valid_loader, model, args)
+        auc, acc,precision,recall,f1, preds , _ = validate(valid_loader, model, args)
 
         ### TODO: model save or early stopping
         if args.wandb.using:
             wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
-                  "valid_auc":auc, "valid_acc":acc})
+                "train_precision": train_precision,"train_recall":train_recall,"train_f1":train_f1,
+                  "valid_auc":auc, "valid_acc":acc,"valid_precision":precision,"valid_recall":recall,"valid_f1":f1})
         if auc > best_auc:
             best_auc = auc
-            accuracy = acc
+            best_accuracy = acc
+            best_precision=precision
+            best_recall=recall
+            best_f1=f1
+            best_preds=preds
             # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
             model_to_save = model.module if hasattr(model, 'module') else model
             save_checkpoint({
@@ -101,7 +109,7 @@ def run(args, train_data, valid_data):
         else:
             scheduler.step()
     
-    print(f"best AUC : {best_auc}, accuracy : {accuracy}")
+    print(f"best AUC : {best_auc}, accuracy : {best_accuracy}, precision : {best_precision}, recall : {best_recall}, f1 : {best_f1}")
 
 
 def run_kfold(args, train_data):
@@ -133,12 +141,13 @@ def run_kfold(args, train_data):
         print(features)
 
         if args.split_by_user: #유저별로 train/valid set을 나눌 때
-            y_oof,pred,fi,score,acc=make_lgb_user_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
-            if args.wandb.using:
-                wandb.log({"valid_auc":score, "valid_acc":acc})
+            y_oof,pred,fi,score,acc, precision, recall, f1=make_lgb_user_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
+            
         else : #skl split라이브러리를 이용하여 유저 구분없이 나눌 때 
-            y_oof,pred,fi=make_lgb_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
+            y_oof,pred,fi, score,acc, precision, recall, f1=make_lgb_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
         
+        if args.wandb.using:
+            wandb.log({"valid_auc":score, "valid_acc":acc, "valid_precision": precision, "valid_recall": recall,"valid_f1": f1})
         
         new_output_path=f'{args.output_dir}{args.task_name}'
         write_path = os.path.join(new_output_path, "output.csv")
@@ -171,7 +180,9 @@ def run_kfold(args, train_data):
     target = get_target(train_data)
     val_auc = 0
     val_acc = 0
-
+    val_precision=0
+    val_recall=0
+    val_f1=0
     oof = np.zeros(train_data.shape[0])
 
     for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data, target)):
@@ -191,6 +202,9 @@ def run_kfold(args, train_data):
 
         best_auc = -1
         best_acc = 0
+        best_precision=-1
+        best_recall=-1
+        best_f1=-1
         best_preds = None
 
         early_stopping_counter = 0
@@ -199,19 +213,23 @@ def run_kfold(args, train_data):
             print(f"Start Training: Epoch {epoch + 1}")
             
             ### TRAIN
-            train_auc, train_acc, train_loss = train(train_loader, model, optimizer, args)
-            
+            train_auc, train_acc, train_precision,train_recall,train_f1 train_loss = train(train_loader, model, optimizer, args)
+        
             ### VALID
-            auc, acc, preds , _ = validate(valid_loader, model, args)
+            auc, acc,precision,recall,f1, preds , _ = validate(valid_loader, model, args)
 
             ### TODO: model save or early stopping
             if args.wandb.using:
                 wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
-                    "valid_auc":auc, "valid_acc":acc})
-
+                "train_precision": train_precision,"train_recall":train_recall,"train_f1":train_f1,
+                  "valid_auc":auc, "valid_acc":acc,"valid_precision":precision,"valid_recall":recall,"valid_f1":f1})
+        
             if auc > best_auc:
                 best_auc = auc
-                best_acc = acc
+                best_accuracy = acc
+                best_precision=precision
+                best_recall=recall
+                best_f1=f1
                 best_preds = preds
                 # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
                 model_to_save = model.module if hasattr(model, 'module') else model
@@ -236,10 +254,14 @@ def run_kfold(args, train_data):
         
         val_auc += best_auc/n_splits
         val_acc += best_acc/n_splits
+        val_precision += best_precision/n_splits
+        val_recall += best_recall/n_splits
+        val_f1 += best_f1/n_splits
+
         oof[valid_idx] = best_preds
 
     
-    print(f'Valid AUC : {val_auc}, Valid ACC : {val_acc} \n')
+    print(f"Valid AUC : {val_auc}, accuracy : {val_acc}, precision : {val_precision}, recall : {val_recall}, f1 : {val_f1}")
 
 
 def train(train_loader, model, optimizer, args):
@@ -290,10 +312,10 @@ def train(train_loader, model, optimizer, args):
     total_targets = np.concatenate(total_targets)
 
     # Train AUC / ACC
-    auc, acc = get_metric(total_targets, total_preds)
+    auc, acc ,precision,recall,f1 = get_metric(total_targets, total_preds)
     loss_avg = sum(losses)/len(losses)
-    print(f'TRAIN AUC : {auc} ACC : {acc}')
-    return auc, acc, loss_avg
+    print(f'TRAIN AUC : {auc} ACC : {acc} precision : {precision} recall : {recall} f1 : {f1}')
+    return auc, acc ,precision,recall,f1, loss_avg
     
 
 def validate(valid_loader, model, args):
@@ -332,11 +354,11 @@ def validate(valid_loader, model, args):
     total_targets = np.concatenate(total_targets)
 
     # Train AUC / ACC
-    auc, acc = get_metric(total_targets, total_preds)
+    auc, acc ,precision,recall,f1 = get_metric(total_targets, total_preds)
     
-    print(f'VALID AUC : {auc} ACC : {acc}\n')
+    print(f'VALID AUC : {auc} ACC : {acc} precision : {precision} recall : {recall} f1 : {f1}')
 
-    return auc, acc, total_preds, total_targets
+    return auc, acc ,precision,recall,f1, total_preds, total_targets
 
 
 

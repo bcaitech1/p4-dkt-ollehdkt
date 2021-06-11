@@ -16,7 +16,7 @@ from sklearn.model_selection import train_test_split, cross_val_score, KFold, St
 from sklearn.impute import SimpleImputer
 import numpy as np
 from collections import defaultdict
-
+from metric.py import *
 
 def make_sharing_feature(args):
     """[use train+test(except last row) get pre_processed feature]
@@ -255,10 +255,11 @@ def lgbm_train(args,train_data,valid_data):
             )
 
     preds = model.predict(valid_data[FEATS])
-    acc = accuracy_score(y_test, np.where(preds >= 0.5, 1, 0))
-    auc = roc_auc_score(y_test, preds)
+    auc, acc ,precision,recall,f1 = get_metric(y_test, preds)
+    # acc = accuracy_score(y_test, np.where(preds >= 0.5, 1, 0))
+    # auc = roc_auc_score(y_test, preds)
 
-    print(f'VALID AUC : {auc} ACC : {acc}\n')
+    print(f'VALID AUC : {auc} ACC : {acc} precision : {precision} recall : {recall} f1 : {f1}')
     
     ax = lgb.plot_importance(model,figsize=(12,7))
     #Feature Importance 저장
@@ -268,7 +269,7 @@ def lgbm_train(args,train_data,valid_data):
         os.makedirs(new_output_path) 
     ax.figure.savefig(write_path,bbox_inches='tight', pad_inches=0.5)
 
-    return model,auc,acc
+    return model,auc, acc ,precision,recall,f1
     
 def lgbm_inference(args,model, test_data):
     
@@ -340,6 +341,9 @@ def make_lgb_user_oof_prediction(args, train, test, features, categorical_featur
     # 폴드별 평균 Validation 스코어를 저장할 변수
     score = 0
     acc=0
+    precision=0
+    recall=0
+    f1=0
     # 피처 중요도를 저장할 데이터 프레임 선언
     fi = pd.DataFrame()
     fi['feature'] = features
@@ -374,14 +378,17 @@ def make_lgb_user_oof_prediction(args, train, test, features, categorical_featur
         # y_oof[fold] = val_preds
         
         # 폴드별 Validation 스코어 측정
-        fold_acc=accuracy_score(y_val, list(map(round,val_preds)))
-        
-        print(f"Fold {fold + 1} | AUC: {roc_auc_score(y_val, val_preds)} | ACC: {fold_acc}")
+        fold_auc, fold_acc ,fold_precision,fold_recall,fold_f1 = get_metric(y_val, list(map(round,val_preds)))
+    
+        print(f"Fold {fold + 1} | AUC: {roc_auc_score(y_val, val_preds)} | ACC: {fold_acc} | Precision: {fold_precision} | Recall: {fold_recall} | f1: {fold_f1}")
         print('-'*80)
 
         # score 변수에 폴드별 평균 Validation 스코어 저장
-        score += roc_auc_score(y_val, val_preds) / folds
+        score += fold_auc / folds
         acc+=fold_acc / folds
+        precision=fold_precision / folds
+        recall = fold_recall / folds
+        f1 = fold_f1 / folds
         # 테스트 데이터 예측하고 평균해서 저장
         test_preds += clf.predict(x_test) / folds
         
@@ -393,6 +400,9 @@ def make_lgb_user_oof_prediction(args, train, test, features, categorical_featur
         
     print(f"\nMean AUC = {score}") # 폴드별 Validation 스코어 출력
     print(f"Mean ACC = {acc}") # 폴드별 Validation 스코어 출력
+    print(f"\nMean Precision = {precision}") # 폴드별 Validation 스코어 출력
+    print(f"Mean Recall = {recall}") # 폴드별 Validation 스코어 출력
+    print(f"Mean f1 = {f1}") # 폴드별 Validation 스코어 출력
     # print(f"OOF AUC = {roc_auc_score(y, y_oof)}") # Out Of Fold Validation 스코어 출력
     
     # 폴드별 피처 중요도 평균값 계산해서 저장 
@@ -429,7 +439,7 @@ def make_lgb_user_oof_prediction(args, train, test, features, categorical_featur
     plt.savefig(write_path,bbox_inches='tight', pad_inches=0.5)
     plt.close()   
     
-    return y_oof, test_preds, fi , score, acc
+    return y_oof, test_preds, fi , score, acc, precision, recall, f1
 
 
 def make_lgb_oof_prediction(args,train, test, features, categorical_features='auto', model_params=None, folds=None):
@@ -446,6 +456,10 @@ def make_lgb_oof_prediction(args,train, test, features, categorical_features='au
     
     # 폴드별 평균 Validation 스코어를 저장할 변수
     score = 0
+    acc=0
+    precision=0
+    recall=0
+    f1=0
     
     # 피처 중요도를 저장할 데이터 프레임 선언
     fi = pd.DataFrame()
@@ -481,14 +495,19 @@ def make_lgb_oof_prediction(args,train, test, features, categorical_features='au
         
         # Validation index에 예측값 저장 
         y_oof[val_idx] = val_preds
-        
+
+        fold_auc, fold_acc ,fold_precision,fold_recall,fold_f1 = get_metric(y_val, list(map(round,val_preds)))
+    
         # 폴드별 Validation 스코어 측정
-        print(f"Fold {fold + 1} | AUC: {roc_auc_score(y_val, val_preds)}")
+        print(f"Fold {fold + 1} | AUC: {roc_auc_score(y_val, val_preds)} | ACC: {fold_acc} | Precision: {fold_precision} | Recall: {fold_recall} | f1: {fold_f1}")
         print('-'*80)
 
         # score 변수에 폴드별 평균 Validation 스코어 저장
-        score += roc_auc_score(y_val, val_preds) / folds
-        
+        score += fold_auc / folds
+        acc+=fold_acc / folds
+        precision=fold_precision / folds
+        recall = fold_recall / folds
+        f1 = fold_f1 / folds
         # 테스트 데이터 예측하고 평균해서 저장
         test_preds += clf.predict(x_test) / folds
         
@@ -499,7 +518,11 @@ def make_lgb_oof_prediction(args,train, test, features, categorical_features='au
         gc.collect()
         
     print(f"\nMean AUC = {score}") # 폴드별 Validation 스코어 출력
-    print(f"OOF AUC = {roc_auc_score(y, y_oof)}") # Out Of Fold Validation 스코어 출력
+    print(f"Mean ACC = {acc}") # 폴드별 Validation 스코어 출력
+    print(f"\nMean Precision = {precision}") # 폴드별 Validation 스코어 출력
+    print(f"Mean Recall = {recall}") # 폴드별 Validation 스코어 출력
+    print(f"Mean f1 = {f1}") # 폴드별 Validation 스코어 출력
+    # print(f"OOF AUC = {roc_auc_score(y, y_oof)}") # Out Of Fold Validation 스코어 출력
     
     # 폴드별 피처 중요도 평균값 계산해서 저장 
     fi_cols = [col for col in fi.columns if 'fold_' in col]
@@ -535,4 +558,4 @@ def make_lgb_oof_prediction(args,train, test, features, categorical_features='au
     plt.savefig(write_path,bbox_inches='tight', pad_inches=0.5)
     plt.close()   
     
-    return y_oof, test_preds, fi
+    return y_oof, test_preds, fi, score, acc, precision, recall, f1
