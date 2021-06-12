@@ -1,4 +1,4 @@
-model : lstm    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint}
+model : saint    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint}
 
 wandb :
     using: True
@@ -10,7 +10,7 @@ wandb :
         - baseline
 
 ##main params
-task_name: lstm_test
+task_name: saint_test
 seed: 42
 device: cuda
 
@@ -25,7 +25,7 @@ output_dir: output/
 max_seq_len: 20
 num_workers: 1
 use_stratify : True
-n_fold : 8
+n_fold : 3
 
 ##모델
 hidden_dim : 128

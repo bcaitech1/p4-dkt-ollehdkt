@@ -1,7 +1,9 @@
 import os
+import gc
 import json
 import torch
 import numpy as np
+import pandas as pd
 
 from tqdm.auto import tqdm
 from .dataloader import get_loaders
@@ -129,6 +131,7 @@ def run_kfold(args, train_data):
     val_acc = 0
 
     oof = np.zeros(train_data.shape[0])
+    oof_target = np.zeros(train_data.shape[0])
 
     for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data, target)):
         trn_data = train_data[train_idx]
@@ -157,11 +160,11 @@ def run_kfold(args, train_data):
             train_auc, train_acc, train_loss = train(train_loader, model, optimizer, args)
             
             ### VALID
-            auc, acc, preds , _ = validate(valid_loader, model, args)
+            auc, acc, preds, targets = validate(valid_loader, model, args)
 
             ### TODO: model save or early stopping
-            wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
-                    "valid_auc":auc, "valid_acc":acc})
+            # wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
+            #         "valid_auc":auc, "valid_acc":acc})
             if auc > best_auc:
                 best_auc = auc
                 best_acc = acc
@@ -186,12 +189,27 @@ def run_kfold(args, train_data):
                 scheduler.step(best_auc)
             else:
                 scheduler.step()
+
+            gc.collect()
         
         val_auc += best_auc/n_splits
         val_acc += best_acc/n_splits
         oof[valid_idx] = best_preds
+        oof_target[valid_idx] = targets
+        
+        
 
     
+    oof_df = pd.DataFrame()
+    oof_df['preds'] = oof
+    oof_df['target'] = oof_target
+
+    new_output_path=f'{args.output_dir}/{args.task_name}'
+    write_path = os.path.join(new_output_path, "oof_preds.csv")
+    if not os.path.exists(new_output_path):
+        os.makedirs(new_output_path)
+    oof_df.to_csv(write_path, index=False)
+
     print(f'Valid AUC : {val_auc}, Valid ACC : {val_acc} \n')
 
 
@@ -379,7 +397,7 @@ def get_model(args,model_name:str):
     if model_name == 'bert': model = Bert(args)
     if model_name == 'lstmroberta' : model = LSTMRobertaATTN(args)
     if model_name == 'lastquery': model = LastQuery(args)
-    if model_name == 'saint': model = Sain(args)
+    if model_name == 'saint': model = Saint(args)
     
 
     model.to(args.device)
