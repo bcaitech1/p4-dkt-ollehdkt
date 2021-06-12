@@ -23,7 +23,9 @@ from transformers.models.convbert.modeling_convbert import ConvBertConfig, ConvB
 from transformers.models.roberta.modeling_roberta import RobertaConfig,RobertaEncoder,RobertaModel
 from transformers.models.albert.modeling_albert import AlbertAttention, AlbertTransformer, AlbertModel
 from transformers.models.albert.configuration_albert import AlbertConfig
-from transformers import BertPreTrainedModel
+from transformers import BertPreTrainedModel 
+from transformers import GPT2Config, GPT2Model
+from transformers import XLMRobertaModel, XLMRobertaConfig 
 
 import gc
 
@@ -51,10 +53,18 @@ class CommonModule(nn.Module):
 
         self.concat_reverse = self.args.concat_reverse
         self.embedding_interaction = nn.Embedding(3,self.hidden_dim//2)
-        self.embedding_cate = nn.ModuleList([
-            nn.Embedding(v+1,self.hidden_dim//2)
-            for k,v in self.args.cate_dict.items()
-        ])
+        ## 모델에 따라 분리
+
+        if 'lastquery' in self.args.model:
+            self.embedding_cate = nn.ModuleList([
+                nn.Embedding(v+1,self.hidden_dim//2)
+                for k,v in self.args.cate_dict.items()
+            ])
+        else:
+            self.embedding_cate = nn.ModuleList([
+                nn.Embedding(v+1,self.hidden_dim//2)
+                for k,v in self.args.cate_dict.items()
+            ])
         self.n_heads=args.n_heads
         
         # 범주형 hidden dimension 공식
@@ -123,48 +133,64 @@ class LastQuery(nn.Module):
         self.args = args
         self.device = args.device
         self.cm = CommonModule(args)
-        self.hidden_dim = self.cm.hidden_dim//2
+        self.hidden_dim = self.cm.hidden_dim
 
         # 범주형 임베딩을 projection이나, q,k,v 에 쓰일 예정
-        self.hidden_dim_used =  (self.hidden_dim)*(len(self.cm.cate_cols)) # (입력 hidden_dim)//2 * (범주형 컬럼 수)
+        self.hidden_dim_cate =  (self.hidden_dim//2)*(len(self.cm.cate_cols)) # (입력 hidden_dim)//2 * (범주형 컬럼 수)
+        self.hidden_dim_cont = (self.hidden_dim//2)*(len(self.cm.cont_cols)) # (입력 hidden_dim)//2 * (연속형 컬럼 수)
 
         # Embedding 
         # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
         self.embedding_interaction = self.cm.embedding_interaction
         self.embedding_cate = self.cm.embedding_cate
-        self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim)
+        self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim//2)
         
         # encoder combination projection
-        self.cate_proj = nn.Linear(self.hidden_dim_used, self.hidden_dim_used)
+        # self.cate_proj = nn.Linear(self.hidden_dim_used, self.hidden_dim_used)
+
+        self.cate_proj = nn.Sequential(
+            nn.Linear(self.hidden_dim_cate, self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim)
+        )
+
+        if self.hidden_dim_cont>0:
+            self.cont_proj = nn.Sequential(
+                nn.Linear(self.hidden_dim_cont, self.hidden_dim),
+                nn.LayerNorm(self.hidden_dim)
+            )
 
 
         # 기존 keetar님 솔루션에서는 Positional Embedding은 사용되지 않습니다
         # 하지만 사용 여부는 자유롭게 결정해주세요 :)
         # Position-Embedding 사용여부
         self.is_position_embedding = False
-        self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim_used)
+        self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim_cate)
+
+        # print(self.hidden_dim_cate)
         
+        self.unified_dim = (self.hidden_dim if self.hidden_dim_cate>0 else 0) 
+        + (self.hidden_dim if self.hidden_dim_cont>0 else 0) # q,k,v에 쓸 범주형 + 연속형 dim 합
         # Encoder
-        self.query = nn.Linear(in_features=self.hidden_dim_used, out_features=self.hidden_dim_used)
-        self.key = nn.Linear(in_features=self.hidden_dim_used, out_features=self.hidden_dim_used)
-        self.value = nn.Linear(in_features=self.hidden_dim_used, out_features=self.hidden_dim_used)
+        self.query = nn.Linear(in_features=self.unified_dim, out_features=self.unified_dim)
+        self.key = nn.Linear(in_features=self.unified_dim, out_features=self.unified_dim)
+        self.value = nn.Linear(in_features=self.unified_dim, out_features=self.unified_dim)
 
-        self.attn = nn.MultiheadAttention(embed_dim=self.hidden_dim_used, num_heads=self.args.n_heads, dropout=self.cm.drop_out)
+        self.attn = nn.MultiheadAttention(embed_dim=self.unified_dim, num_heads=self.args.n_heads, dropout=self.cm.drop_out)
         self.mask = None # last query에서는 필요가 없지만 수정을 고려하여서 넣어둠
-        self.ffn = FFN(self.args,self.hidden_dim_used)      
+        self.ffn = FFN(self.args,self.unified_dim)      
 
-        self.ln1 = nn.LayerNorm(self.hidden_dim_used)
-        self.ln2 = nn.LayerNorm(self.hidden_dim_used)
+        self.ln1 = nn.LayerNorm(self.unified_dim)
+        self.ln2 = nn.LayerNorm(self.unified_dim)
 
         # LSTM
         self.lstm = nn.LSTM(
-            self.hidden_dim_used,
-            self.hidden_dim_used,
+            self.unified_dim,
+            self.unified_dim,
             self.args.n_layers,
             batch_first=True)
 
         # Fully connected layer
-        self.fc = nn.Linear(self.hidden_dim_used, 1)
+        self.fc = nn.Linear(self.unified_dim, 1)
        
         self.activation = nn.Sigmoid()
 
@@ -222,9 +248,18 @@ class LastQuery(nn.Module):
         embed_cate,mask,embed_interaction,embed_cont,gather_index = self.cm.embed(input)
 
         # 신나는 embedding -> 그런거 없다
-        embed = torch.cat(embed_cate, 2)
+        cate_embed = torch.cat(embed_cate, 2)
         # print(embed.shape)
-        embed = self.cate_proj(embed)
+        cate_embed = self.cate_proj(cate_embed)
+
+        print(cate_embed.shape)
+        print(self.unified_dim)
+
+        if embed_cont is not None:
+            cont_embed = self.cont_proj(embed_cont)
+            embed = torch.cat([cate_embed,cont_embed],2)
+        else:
+            embed = cate_embed
 
         # Positional Embedding
         # last query에서는 positional embedding을 하지 않음
@@ -274,12 +309,12 @@ class LastQuery(nn.Module):
         out = self.ln2(out)
 
         ###################### LSTM #####################
-        hidden = self.init_hidden(batch_size, self.hidden_dim_used)
+        hidden = self.init_hidden(batch_size, self.unified_dim)
         out, hidden = self.lstm(out, hidden)
 
         ###################### DNN #####################
 
-        out = out.contiguous().view(batch_size, -1, self.hidden_dim_used)
+        out = out.contiguous().view(batch_size, -1, self.unified_dim)
         out = self.fc(out)
 
         preds = self.activation(out).view(batch_size, -1)
@@ -710,4 +745,90 @@ class GeneralizedLSTMConvATTN(nn.Module):
         del sequence_output
         del encoded_layers
         gc.collect()
+        return preds
+
+
+class AutoTransformerModel(nn.Module):
+
+    def __init__(self, args):
+        super(AutoTransformerModel, self).__init__()
+        self.args = args
+        self.device = args.device
+        self.cm = CommonModule(args)
+        self.concat_reverse = self.cm.concat_reverse
+        # Defining some parameters
+        self.hidden_dim = self.cm.hidden_dim
+        self.n_layers = self.args.n_layers
+        self.n_cate_cols = self.cm.n_cate_cols
+        self.hidden_dim_cate = (self.n_cate_cols+1)*(self.hidden_dim//2)
+        print(self.hidden_dim_cate)
+        # embedding combination projection
+        self.comb_proj = nn.Sequential(
+            nn.Linear(self.hidden_dim_cate,self.hidden_dim*2),
+            nn.LayerNorm(self.hidden_dim*2)
+        )
+        self.embedding_cont = self.cm.embedding_cont
+        self.embedding_cate = self.cm.embedding_cate
+
+        # Defining the layers
+
+        self.model = self.args.model.lower()
+        
+        if self.model == 'gpt2':
+            self.config = GPT2Config( 
+            3, # not used
+            n_embd=self.hidden_dim*2,
+            n_layer=self.args.n_layers,
+            n_head=self.args.n_heads,
+            n_positions=self.args.max_seq_len          
+        )
+            self.encoder = GPT2Model(self.config)
+            self.encoder = self.encoder.to(self.device)
+        else:
+            # Bert config
+            self.config = BertConfig( 
+                3, # not used
+                hidden_size=self.hidden_dim*2,
+                num_hidden_layers=self.args.n_layers,
+                num_attention_heads=self.args.n_heads,
+                max_position_embeddings=self.args.max_seq_len          
+            )
+            # Bert Layer
+            self.encoder = BertModel(self.config)  
+
+        # Fully connected layer
+        self.fc = nn.Linear(self.hidden_dim*2, 1)
+        self.drop_out = nn.Dropout(p=args.drop_out)
+        self.activation = nn.Sigmoid()
+        # self.activation=nn.Tanh()
+
+
+    def forward(self, input):
+        embed_cate,mask,embed_interaction,embed_cont,gather_index = self.cm.embed(input)
+
+        batch_size = input[0].size(0)
+        cate_list = [embed_interaction]
+        cate_list.extend(embed_cate)
+
+        embed_cate = torch.cat(cate_list,2)
+        
+        embed_cate = self.comb_proj(embed_cate)
+
+        if embed_cont is not None:
+            embed_cont = self.embedding_cont(embed_cont)
+            print(embed_cont.shape)
+            X = torch.cat([embed_cate,embed_cont],2)
+        else : 
+            X = embed_cate
+
+        # Bert
+        X = X.to(self.device)
+        mask = mask.to(self.device)
+        # print(X)
+        encoded_layers = self.encoder(inputs_embeds=X, attention_mask=mask)
+        out = encoded_layers[0]
+        out = out.contiguous().view(batch_size, -1, self.hidden_dim*2)
+        out = self.fc(out)
+        preds = self.activation(out).view(batch_size, -1)
+
         return preds

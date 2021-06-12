@@ -250,7 +250,7 @@ def train(train_loader, model, optimizer, args):
             
             input = process_batch_v2(batch, args)
         elif isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint) or isinstance(model, GeneralizedSaintPlus)\
-            or isinstance(model,LastQuery):
+            or isinstance(model,LastQuery) or isinstance(model,AutoTransformerModel):
             
             input = process_batch_v3(batch,args)
         else:
@@ -307,7 +307,7 @@ def validate(valid_loader, model, args):
             input = process_batch_v2(batch, args)
 
         elif isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint) or isinstance(model, GeneralizedSaintPlus)\
-        or isinstance(model,LastQuery):
+        or isinstance(model,LastQuery) or isinstance(model,AutoTransformerModel):
             # print('process_batch_v3 사용 for validate')
             input = process_batch_v3(batch, args)
         else:
@@ -361,7 +361,7 @@ def inference(args, test_data):
         # input = process_batch(batch, args)
         # input = process_batch_test(batch,args)
         if isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint) or isinstance(model, LastQuery)\
-        or isinstance(model,GeneralizedSaintPlus):
+        or isinstance(model,GeneralizedSaintPlus) or isinstance(model,AutoTransformerModel):
             input = process_batch_v3(batch,args)
         else:
             input = process_batch_v2(batch,args)
@@ -448,7 +448,7 @@ def get_model(args):
     """
     if args.model.lower() == 'lstm': model = LSTM(args)
     # if args.model.lower() == 'lstmattn': model = LSTMATTN(args)
-    if args.model.lower() == 'bert': model = Bert(args)
+    # if args.model.lower() == 'bert': model = Bert(args)
     if args.model.lower() == 'bilstmattn': model = BiLSTMATTN(args)
     if args.model.lower() == 'lstmconvattn' or args.model.lower() == 'lstmrobertaattn' or args.model.lower() == 'lstmattn'\
        or args.model.lower() == 'lstmalbertattn': 
@@ -466,6 +466,7 @@ def get_model(args):
     if args.model.lower() == 'generalizedlstmconvattn' or args.model.lower() == 'glstmconvattn' : model = GeneralizedLSTMConvATTN(args)
     if args.model.lower() == 'generalizedsaint' or args.model.lower() == 'gsaint': model = GeneralizedSaint(args)
     if args.model.lower() == 'generallizedsaintplus' or args.model.lower() == 'gsaintplus' : model = GeneralizedSaintPlus(args)
+    if args.model.lower() in ['bert','gpt2'] : model = AutoTransformerModel(args)
 
     model.to(args.device)
 

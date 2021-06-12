@@ -98,6 +98,9 @@ class Preprocess:
             os.makedirs(self.args.asset_dir)
             
         for col in cate_cols:
+            print(f'컬럼 : {col}')
+            if col in ['grade']: # grade는 모두 9로 매핑하는 버그가 있어 제외시킨다
+                continue
             le = LabelEncoder()
             if is_train:
                 #For UNKNOWN class
@@ -113,11 +116,13 @@ class Preprocess:
                 df[col] = df[col].apply(lambda x: x if x in le.classes_ else 'unknown')
             
             #모든 컬럼이 범주형이라고 가정
+            
             df[col]= df[col].astype(str)
+            
             test = le.transform(df[col])
             df[col] = test
             
-
+        print(df)
         def convert_time(s):
             timestamp = time.mktime(datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timetuple())
             return int(timestamp)
@@ -153,10 +158,10 @@ class Preprocess:
                 # df['hour'] = df.sec_time.apply(lambda x : f'h-{x//3600}')
                 # df['min'] = df.sec_time.apply(lambda x : f'm-{(x%3600)//60}')
                 # df['sec'] = df.sec_time.apply(lambda x : f's-{x%60}')
-                print('확인')
+                
                 df['solve_time'] = df['solve_time'].apply(lambda x : int(round(x)))
                 
-
+            df = fe.feature_engineering_14(df)
             print('dataframe 확인')
             print(df)
 
@@ -177,8 +182,8 @@ class Preprocess:
         df = self.__feature_engineering(df)
 
         # ※ 주의 : gsaintplus 이용 시 밤주형만 입력할 것
-        self.args.cate_cols = ['testId','assessmentItemID','KnowledgeTag','solve_time'] # 실험할 범주형
-        self.args.cont_cols = [] # 실험할 연속형 (user_acc)'solve_time', 'user_acc','user_correct_answer', 'user_total_answer'
+        self.args.cate_cols = ['assessmentItemID','testId','KnowledgeTag'] # 실험할 범주형
+        self.args.cont_cols = [] # 실험할 연속형 (user_acc)'solve_time', 'user_acc','user_correct_answer', 'user_total_answer',
         df = self.__preprocessing_v2(df, is_train)
 
         # 유효 컬럼만 거르기 (Optional)
@@ -190,7 +195,10 @@ class Preprocess:
         d= {} # key는 컬럼명, values는 임베딩 시킬 수
 
         for i in self.args.cate_cols:
-            d[i] = len(np.load(os.path.join(self.args.asset_dir,f'{i}_classes.npy')))
+            if i=='grade':
+                d[i] = 9
+            else:
+                d[i] = len(np.load(os.path.join(self.args.asset_dir,f'{i}_classes.npy')))
         print(f'임베딩 사이즈 확인')
         print(d)
         self.args.cate_dict = d
@@ -232,11 +240,13 @@ class Preprocess:
 
         print('보낼 최종컬럼 확인')
         print(ret)
-        group = df[columns].groupby('userID').apply(
+        # print(df[columns])
+        group = df.groupby('userID').apply(
                 lambda r: tuple([r[i].values for i in ret])
             )
         
         print(f'group.values->{len(group.values)}')
+        print(group)
 
         del df
         gc.collect()
@@ -636,10 +646,15 @@ def shuffle(data, data_size, args):
 
 
 def data_augmentation(data, args):
-    
+    print(f'Before Augmentation : {len(data)}')
     if args.window == True:
         print("Data Augmentation : Slidding Window")
         data = slidding_window(data, args)
+        print(f'After Augmentation : {len(data)}')
+    else:
+        print(f'No Augmentation')
+
+    
 
     return data
 

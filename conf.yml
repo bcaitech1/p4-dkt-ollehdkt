@@ -18,7 +18,7 @@ wandb :
         - baseline
 
 ##main params
-task_name: slidding_window_max_seq_len_32
+task_name: slidding_window_max_seq_len_128
 seed: 42
 device: cuda
 
@@ -36,7 +36,7 @@ asset_dir: asset/
 model_dir: models/
 output_dir: output/
 
-max_seq_len: 32
+max_seq_len: 128
 num_workers: 1
 
 ##K-fold params
@@ -47,9 +47,9 @@ split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
 hidden_dim : 256
-n_layers : 4
-n_heads : 8
-drop_out: 0.5
+n_layers : 2
+n_heads : 2
+drop_out: 0.2
 
 # Augmentation
 window : False # 슬라이딩 윈도우를 사용할 것인지
@@ -61,9 +61,9 @@ shuffle_n : 3
 concat_reverse : False
 
 #train
-n_epochs: 1
+n_epochs: 50
 batch_size: 2048
-lr: 0.0005
+lr: 0.0001
 clip_grad : 10
 patience : 50
 log_steps : 50

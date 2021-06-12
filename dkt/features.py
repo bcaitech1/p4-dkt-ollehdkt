@@ -344,3 +344,8 @@ class Features:
         test_df['hour_rate'] = round(test_df['hour_ans_cnt'] / test_df['hour_cnt'], 2)
         return test_df
 
+    # 학년 발굴
+    def feature_engineering_14(df):
+        df['grade'] = df['testId'].apply(lambda x: x[2]).astype(int)
+        return df
+
