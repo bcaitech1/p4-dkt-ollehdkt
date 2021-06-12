@@ -274,10 +274,10 @@ def train(train_loader, model, optimizer, args):
     for step, batch in enumerate(train_loader):
         gc.collect()
         if isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
-             or isinstance(model, TfixupSaint) or isinstance(model,LSTM) or isinstance(model, AutoEncoderLSTMATTN):
+             or isinstance(model, TfixupSaint) or isinstance(model,LSTM) or isinstance(model, LSTMATTN):
             input = process_batch_v2(batch, args)
         else:
-            input = process_batch(batch,args)
+            input = process_batch_v2(batch,args)
         # print(f"input 텐서 사이즈 : {type(input)}, {len(input)}")
         preds = model(input)
         targets = input[-1] # correct

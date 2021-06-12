@@ -54,30 +54,29 @@ class Saint(nn.Module):
 
         self.hidden_dim = self.args.hidden_dim
         # self.dropout = self.args.drop_out
-        self.dropout =0.
+        self.dropout =args.drop_out
 
-        self.cont_cols=self.args.cont_cols
+        #userID때문에 하나 뺌
+        cate_len=len(args.cate_feats)-1
+        #answerCode 때문에 하나 뺌
+        cont_len=len(args.cont_feats)-1
+
         ### Embedding 
-        # ENCODER embedding
+        # ENCODER embedding - for cate
+        # cate Embedding 
+        self.cate_embedding_list = nn.ModuleList([nn.Embedding(max_val+1, (self.hidden_dim)//cate_len) for max_val in list(args.cate_feat_dict.values())[1:]]) 
+        # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
+        self.embedding_interaction = nn.Embedding(3, (self.hidden_dim)//cate_len)
 
-        self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
-        self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
-        self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
-
-        # self.n_other_features = self.args.n_other_features
-        # print(self.n_other_features)
         
-        # encoder combination projection
-        self.enc_comb_proj = nn.Linear((self.hidden_dim//3)*3, self.hidden_dim)
+        # DECODER embedding - for cont
+        # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
+        # cont Embedding
+        self.cont_embedding = nn.Linear(1, (self.hidden_dim)//cont_len)
 
-        # DECODER embedding
-        # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
-        self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
-   
-        # decoder combination projection
-        self.dec_comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim//2)
-        #cont feature
-        self.cont_proj=nn.Linear(self.cont_cols,self.hidden_dim//2)
+        # comb linear
+        self.cate_comb_proj = nn.Linear(((self.hidden_dim)//cate_len)*(cate_len+1), self.hidden_dim) #interaction을 나중에 더하므로 +1
+        self.cont_comb_proj = nn.Linear(((self.hidden_dim)//cont_len)*cont_len, self.hidden_dim)
 
         # Positional encoding
         self.pos_encoder = PositionalEncoding(self.hidden_dim, self.dropout, self.args.max_seq_len)
@@ -110,75 +109,46 @@ class Saint(nn.Module):
         return mask.masked_fill(mask==1, float('-inf'))
 
     def forward(self, input):
-        # test, question, tag, _, mask, interaction, _ = input
-
-        # # print(f'input 길이 : {len(input)}')
+        #userID가 빠졌으므로 -1
+        cate_feats=input[:len(self.args.cate_feats)-1]
+        # print("cate_feats개수",len(cate_feats))
         
-        # # input의 순서는 test, question, tag, _, mask, interaction, (...other features), gather_index(안 씀)
+        #answercode가 없으므로 -1
+        cont_feats=input[len(self.args.cate_feats)-1:-4]
+        # print("cont_feats개수",len(cont_feats))      
+        interaction=input[-4]
+        mask=input[-3]
+        gather_index=input[-2]
 
-        # # for i,e in enumerate(input):
-        # #     print(f'i 번째 : {e[i].shape}')
-        test, question,tag, correct, mask, interaction, solve_time, gather_index=input
-
-        # other_features = [input[i] for i in range(6,len(input)-1)]
-        
         batch_size = interaction.size(0)
         seq_len = interaction.size(1)
 
-        solve_time=solve_time.unsqueeze(-1) #shape(B,MSL) -> shape(B, MSL, 1)
-        
-        
 
         # 신나는 embedding
         # ENCODER
-        embed_test = self.embedding_test(test)
-        embed_question = self.embedding_question(question)
-        embed_tag = self.embedding_tag(tag)
-
-        # # dev
-        embed_other_features =[] 
-        
-        # for i,e in enumerate(self.embedding_other_features):
-        #     # print(f'{i}번째 : {e}')
-        #     # print(f'최댓값(전) : {torch.max(other_features[i])}')
-        #     # print(f'최솟값(전) : {torch.min(other_features[i])}')
-        #     embed_other_features.append(e(other_features[i]))
-        #     # print(f'최댓값(후) : {torch.max(other_features[i])}')
-        #     # print(f'최솟값(후) : {torch.min(other_features[i])}')
-        
-        cat_list = [
-                        # embed_interaction,
-                        embed_test,
-                        embed_question,
-                        embed_tag,
-                           ]
-        # cat_list.extend(embed_other_features)
-        embed_enc = torch.cat(cat_list, 2)
-
-        embed_enc = self.enc_comb_proj(embed_enc)
-        
-        # DECODER     
-        embed_test = self.embedding_test(test)
-        embed_question = self.embedding_question(question)
-        embed_tag = self.embedding_tag(tag)
-
+        # cate Embedding
+        cate_feats_embed=[]
         embed_interaction = self.embedding_interaction(interaction)
-        # embed_interaction=self.embedding_dec_interaction(interaction)
+        cate_feats_embed.append(embed_interaction)
 
-        embed_cont=self.cont_proj(solve_time)
+        for i, cate_feat in enumerate(cate_feats): 
+            cate_feats_embed.append(self.cate_embedding_list[i](cate_feat))
         
-        cat_list = [
-                        embed_interaction,
-                        embed_test,
-                        embed_question,
-                        embed_tag,
-                           ]
-        # # cat_list.extend(embed_other_features)
-        embed_dec = torch.cat(cat_list, 2)
-       
-        embed_dec = self.dec_comb_proj(embed_dec)
-        embed_dec=torch.cat([embed_dec, embed_cont], 2) #(batch,msl, 128)
+        #concat cate for Encoder
+        embed_cate = torch.cat(cate_feats_embed, 2)
+        embed_enc=self.cate_comb_proj(embed_cate)
 
+ 
+        # DECODER 
+        # # unsqueeze cont feats shape & embedding
+        cont_feats_embed=[]
+        for cont_feat in cont_feats:
+            cont_feat=cont_feat.unsqueeze(-1)
+            cont_feats_embed.append(self.cont_embedding(cont_feat))
+                
+        embed_cont = torch.cat(cont_feats_embed, 2)
+        embed_dec=self.cont_comb_proj(embed_cont)
+     
         # ATTENTION MASK 생성
         # encoder하고 decoder의 mask는 가로 세로 길이가 모두 동일하여
         # 사실 이렇게 3개로 나눌 필요가 없다

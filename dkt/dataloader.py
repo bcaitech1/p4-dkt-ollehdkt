@@ -75,7 +75,7 @@ class Preprocess:
         if not os.path.exists(self.args.asset_dir):
             os.makedirs(self.args.asset_dir)
             
-        for col in cate_cols:
+        for col in cate_cols[1:]:
             le = LabelEncoder()
             if is_train:
                 #For UNKNOWN class
@@ -94,7 +94,6 @@ class Preprocess:
             
         #cate feat들의 이름 / 고유값 개수를 dict로 conf에 저장
         self.args.cate_feat_dict=dict(zip(cate_cols,[len(df[col].unique()) for col in cate_cols]))
-        print("preprocessing하고 나서 user개수",len(df['userID'].unique()))
         return df
 
     def __feature_engineering(self, df):
@@ -145,6 +144,10 @@ class Preprocess:
         df = self.__feature_engineering(df)
         df = self.__preprocessing(df, is_train)
 
+        df['userID']=df['userID'].astype(int)
+        df['KnowledgeTag']=df['KnowledgeTag'].astype(int)
+        
+
         #column은 cate feats 다음에 cont_feats가 오며 cate feats의 처음은 userid, cont_feats의 처음 피처는 answerCode임
         columns=self.args['cate_feats']+self.args['cont_feats']
         print(columns)
@@ -160,8 +163,8 @@ class Preprocess:
                 lambda r: tuple([r[i].values for i in ret])
             )
         print(group)
-        # print(f"유저수 {len(group)} 피처수 {len(group[0])} 푼 문제 수 {len(group[0][0])}")
-        # len(f'group.values->{len(group.values)}')
+        print(f"유저수 {len(group)} 피처수 {len(group.iloc[0])} 푼 문제 수 {len(group.iloc[0][0])}")
+        len(f'group.values->{len(group.values)}')
         print("load data 후",len(df['userID'].unique()))
         return group.values
 

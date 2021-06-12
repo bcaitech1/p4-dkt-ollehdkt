@@ -49,29 +49,29 @@ class LastQuery_Post(nn.Module):
         self.hidden_dim = self.args.hidden_dim
         
         # Embedding 
-        # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
+        #userID때문에 하나 뺌
+        cate_len=len(args.cate_feats)-1
+        #answerCode 때문에 하나 뺌
+        cont_len=len(args.cont_feats)-1
 
-        self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
-        self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
-        self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
-        self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
-        self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim)
+        # Embedding 
+        # cate Embedding 
+        self.cate_embedding_list = nn.ModuleList([nn.Embedding(max_val+1, (self.hidden_dim//2)//cate_len) for max_val in list(args.cate_feat_dict.values())[1:]]) 
+        # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
+        self.embedding_interaction = nn.Embedding(3, (self.hidden_dim//2)//cate_len)
 
-        self.n_other_features = self.args.n_other_features
-        print(self.n_other_features)
-        
-        # encoder combination projection
-        self.comb_proj = nn.Linear((self.hidden_dim//3)*(4+len(self.n_other_features)), self.hidden_dim)
-
-        # # other feature
-        self.f_cnt = len(self.n_other_features) # feature의 개수
-        self.embedding_other_features = [nn.Embedding(self.n_other_features[i]+1, self.hidden_dim//3) for i in range(self.f_cnt)]
+        # cont Embedding
+        self.cont_embedding = nn.Linear(1, (self.hidden_dim//2)//cont_len)
 
 
         # 기존 keetar님 솔루션에서는 Positional Embedding은 사용되지 않습니다
         # 하지만 사용 여부는 자유롭게 결정해주세요 :)
         self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim)
         
+        # comb linear
+        self.cate_comb_proj = nn.Linear(((self.hidden_dim//2)//cate_len)*(cate_len+1), self.hidden_dim//2) #interaction을 나중에 더하므로 +1
+        self.cont_comb_proj = nn.Linear(((self.hidden_dim//2)//cont_len)*cont_len, self.hidden_dim//2)
+
         # Encoder
         self.query = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim)
         self.key = nn.Linear(in_features=self.hidden_dim, out_features=self.hidden_dim)
@@ -140,54 +140,44 @@ class LastQuery_Post(nn.Module):
 
     def forward(self, input):
 
-        # test, question, tag, _, mask, interaction, index = input
-
-        # for i,e in enumerate(input):
-        #     print(f'i 번째 : {e[i].shape}')
-        test = input[0]
-        question = input[1]
-        tag = input[2]
-
-        mask = input[4]
-        interaction = input[5]
-        
-        other_features = [input[i] for i in range(6,len(input)-1)]
-
-        index = input[len(input)-1]
-
+        #userID가 빠졌으므로 -1
+        cate_feats=input[:len(self.args.cate_feats)-1]
+        # print("cate_feats개수",len(cate_feats))
+  
+        #answercode가 없으므로 -1
+        cont_feats=input[len(self.args.cate_feats)-1:-4]
+        # print("cont_feats개수",len(cont_feats))      
+        interaction=input[-4]
+        mask=input[-3]
+        gather_index=input[-2]
 
         batch_size = interaction.size(0)
         seq_len = interaction.size(1)
 
-        # 신나는 embedding
+         # cate Embedding
+        cate_feats_embed=[]
         embed_interaction = self.embedding_interaction(interaction)
+        cate_feats_embed.append(embed_interaction)
 
-        embed_test = self.embedding_test(test)
-        embed_question = self.embedding_question(question)
-        embed_tag = self.embedding_tag(tag)
-
-        # dev
-        embed_other_features =[] 
+        for i, cate_feat in enumerate(cate_feats): 
+            cate_feats_embed.append(self.cate_embedding_list[i](cate_feat))
         
-        for i,e in enumerate(self.embedding_other_features):
-            # print(f'{i}번째 : {e}')
-            # print(f'최댓값(전) : {torch.max(other_features[i])}')
-            # print(f'최솟값(전) : {torch.min(other_features[i])}')
-            embed_other_features.append(e(other_features[i]))
-            # print(f'최댓값(후) : {torch.max(other_features[i])}')
-            # print(f'최솟값(후) : {torch.min(other_features[i])}')
-
-        cat_list = [embed_interaction,
-                           embed_test,
-                           embed_question,
-                           embed_tag,
-                           ]
-        cat_list.extend(embed_other_features)
+        # unsqueeze cont feats shape & embedding
+        cont_feats_embed=[]
+        for cont_feat in cont_feats:
+            cont_feat=cont_feat.unsqueeze(-1)
+            cont_feats_embed.append(self.cont_embedding(cont_feat))
+            
         
+        #concat cate, cont feats
+        embed_cate = torch.cat(cate_feats_embed, 2)
+        embed_cate=self.cate_comb_proj(embed_cate)
 
-        embed = torch.cat(cat_list, 2)
+        embed_cont = torch.cat(cont_feats_embed, 2)
+        embed_cont=self.cont_comb_proj(embed_cont)
 
-        embed = self.comb_proj(embed)
+
+        embed = torch.cat([embed_cate,embed_cont], 2)
 
         # Positional Embedding
         # last query에서는 positional embedding을 하지 않음
@@ -199,7 +189,7 @@ class LastQuery_Post(nn.Module):
         q = self.query(embed)
 
         # 이 3D gathering은 머리가 아픕니다. 잠시 머리를 식히고 옵니다.
-        q = torch.gather(q, 1, index.repeat(1, self.hidden_dim).unsqueeze(1))
+        q = torch.gather(q, 1, gather_index.repeat(1, self.hidden_dim).unsqueeze(1))
         q = q.permute(1, 0, 2)
 
         k = self.key(embed).permute(1, 0, 2)
@@ -207,7 +197,7 @@ class LastQuery_Post(nn.Module):
 
         ## attention
         # last query only
-        self.mask = self.get_mask(seq_len, index, batch_size).to(self.device)
+        self.mask = self.get_mask(seq_len, gather_index, batch_size).to(self.device)
         out, _ = self.attn(q, k, v, attn_mask=self.mask)
         
         ## residual + layer norm

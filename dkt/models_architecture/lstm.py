@@ -22,7 +22,7 @@ class LSTM(nn.Module):
 
         self.hidden_dim = self.args.hidden_dim
         self.n_layers = self.args.n_layers
-        self.cont_cols=1
+        
         #userID때문에 하나 뺌
         cate_len=len(args.cate_feats)-1
         #answerCode 때문에 하나 뺌
