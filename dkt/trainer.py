@@ -60,7 +60,7 @@ def run(args, train_data, valid_data):
     scheduler = get_scheduler(optimizer, args)
 
     best_auc = -1
-    best_accuracy = -1
+    best_acc = -1
     best_precision=-1
     best_recall=-1
     best_f1=-1
@@ -82,7 +82,7 @@ def run(args, train_data, valid_data):
                   "valid_auc":auc, "valid_acc":acc,"valid_precision":precision,"valid_recall":recall,"valid_f1":f1})
         if auc > best_auc:
             best_auc = auc
-            best_accuracy = acc
+            best_acc = acc
             best_precision=precision
             best_recall=recall
             best_f1=f1
@@ -109,7 +109,7 @@ def run(args, train_data, valid_data):
         else:
             scheduler.step()
     
-    print(f"best AUC : {best_auc}, accuracy : {best_accuracy}, precision : {best_precision}, recall : {best_recall}, f1 : {best_f1}")
+    print(f"best AUC : {best_auc:.5f}, accuracy : {best_acc:.5f}, precision : {best_precision:.5f}, recall : {best_recall:.5f}, f1 : {best_f1:.5f}")
 
 
 def run_kfold(args, train_data):
@@ -226,7 +226,7 @@ def run_kfold(args, train_data):
         
             if auc > best_auc:
                 best_auc = auc
-                best_accuracy = acc
+                best_acc = acc
                 best_precision=precision
                 best_recall=recall
                 best_f1=f1
@@ -261,7 +261,7 @@ def run_kfold(args, train_data):
         oof[valid_idx] = best_preds
 
     
-    print(f"Valid AUC : {val_auc}, accuracy : {val_acc}, precision : {val_precision}, recall : {val_recall}, f1 : {val_f1}")
+    print(f"Valid AUC : {val_auc:.5f}, accuracy : {val_acc:.5f}, precision : {val_precision:.5f}, recall : {val_recall:.5f}, f1 : {val_f1:.5f}")
 
 
 def train(train_loader, model, optimizer, args):
@@ -270,20 +270,17 @@ def train(train_loader, model, optimizer, args):
     total_preds = []
     total_targets = []
     losses = []
-
+    
     for step, batch in enumerate(train_loader):
         gc.collect()
-        # print(len(batch))
-        # input = process_batch(batch, args)
-        # input = process_batch_test(batch, args)
         if isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
              or isinstance(model, TfixupSaint) or isinstance(model,LSTM) or isinstance(model, AutoEncoderLSTMATTN):
-            input = process_batch(batch, args)
+            input = process_batch_v2(batch, args)
         else:
             input = process_batch(batch,args)
         # print(f"input 텐서 사이즈 : {type(input)}, {len(input)}")
         preds = model(input)
-        targets = input[3] # correct
+        targets = input[-1] # correct
 
 
         loss = compute_loss(preds, targets)
@@ -314,7 +311,7 @@ def train(train_loader, model, optimizer, args):
     # Train AUC / ACC
     auc, acc ,precision,recall,f1 = get_metric(total_targets, total_preds)
     loss_avg = sum(losses)/len(losses)
-    print(f'TRAIN AUC : {auc} ACC : {acc} precision : {precision} recall : {recall} f1 : {f1}')
+    print(f'TRAIN AUC : {auc:.5f} ACC : {acc:.5f} precision : {precision:.5f} recall : {recall:.5f} f1 : {f1:.5f}')
     return auc, acc ,precision,recall,f1, loss_avg
     
 
@@ -327,13 +324,13 @@ def validate(valid_loader, model, args):
         # input = process_batch(batch, args)
         if isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
              or isinstance(model, TfixupSaint) or isinstance(model, AutoEncoderLSTMATTN):
-            input = process_batch(batch, args)
+            input = process_batch_v2(batch, args)
         else:
-            input = process_batch(batch,args)
+            input = process_batch_v2(batch,args)
 
 
         preds = model(input)
-        targets = input[3] # correct
+        targets = input[-1] # correct
 
 
         # predictions
@@ -356,7 +353,7 @@ def validate(valid_loader, model, args):
     # Train AUC / ACC
     auc, acc ,precision,recall,f1 = get_metric(total_targets, total_preds)
     
-    print(f'VALID AUC : {auc} ACC : {acc} precision : {precision} recall : {recall} f1 : {f1}')
+    print(f'VALID AUC : {auc:.5f} ACC : {acc:.5f} precision : {precision:.5f} recall : {recall:.5f} f1 : {f1:.5f}')
 
     return auc, acc ,precision,recall,f1, total_preds, total_targets
 
@@ -370,14 +367,14 @@ def inference(args, test_data):
     model = load_model(args)
     model.eval()
     _, test_loader = get_loaders(args, None, test_data)
-    
+    print("test_loader에 대해")
+    print(len(test_loader))
+    print(test_loader)
     
     total_preds = []
 
     for step, batch in enumerate(test_loader):
-        # input = process_batch(batch, args)
-        # input = process_batch_test(batch,args)
-        input = process_batch(batch,args)
+        input = process_batch_v2(batch,args)
 
         preds = model(input)
         
@@ -397,7 +394,7 @@ def inference(args, test_data):
     write_path = os.path.join(new_output_path, "output.csv")
     if not os.path.exists(new_output_path):
         os.makedirs(new_output_path)    
-
+    print("정답의 개수 :",len(total_preds))
     with open(write_path, 'w', encoding='utf8') as w:
         print("writing prediction : {}".format(write_path))
         w.write("id,prediction\n")
@@ -421,7 +418,7 @@ def inference_kfold(args, test_data):
         fold_preds = []
         
         for step, batch in tqdm(enumerate(test_loader)):
-            input = process_batch(batch, args)
+            input = process_batch_v2(batch, args)
             preds = model(input)
 
             # predictions
@@ -480,22 +477,16 @@ def get_model(args):
 
 # 배치 전처리 일반화
 def process_batch_v2(batch, args):
-    print('-'*80)
-    print("process_batch_v2 실행중")
-    # batch : load_data_from 에서 return 시킬 feature(컬럼)
-    # test, question,tag,등등 cate형, 연속형피처, answercode, mask = batch
-    # 규칙 : mask는 항상 맨 뒤임
-    # print(type(batch))
-    cate_cols=batch[:len(args.cate_cols)-1] #userID 빼고
-    print("cate_cols",cate_cols)
-    cont_cols=batch[len(args.cate_cols)-1:-2] #answercode, mask 빼고
-    print("cont_cols",cont_cols)
+
+    cate_cols=batch[:len(args.cate_feats)-1] #userID 빼고
+    # print("cate_cols",cate_cols)
+    cont_cols=batch[len(args.cate_feats)-1:-2] #answercode, mask 빼고
+    # print("cont_cols",cont_cols)
     correct = batch[-2]
     mask = batch[-1]
     # change to float
     mask = mask.type(torch.FloatTensor)
     correct = correct.type(torch.FloatTensor)
-
     #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     #    saint의 경우 decoder에 들어가는 input이다
     interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
@@ -504,31 +495,38 @@ def process_batch_v2(batch, args):
     interaction_mask = mask.roll(shifts=1, dims=1)
     interaction_mask[:, 0] = 0
     interaction = (interaction * interaction_mask).to(torch.int64)
+    
 
     # cate features masking
     for i in range(len(args.cate_feats)-1):
         batch[i] = ((batch[i]+1)*mask).to(torch.int64)
     # cont features masking
     for j in range(len(args.cate_feats)-1,len(batch)-2):
-        batch[j] = ((batch[j]+1)*mask).to(torch.int64)
+        batch[j] = batch[j].type(torch.FloatTensor) 
+        batch[j] = ((batch[j]+1)*mask).to(torch.float32)
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
     gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
     gather_index = gather_index.view(-1, 1) - 1
-
+    
     # feature들 device에 load
     for i in range(len(batch)):
         batch[i] = batch[i].to(args.device)
 
+    correct = correct.to(args.device)
+    mask=mask.to(args.device)
+    interaction=interaction.to(args.device)
+    gather_index = gather_index.to(args.device)
     #userID, answerCode 제거, answer는 이미 get_target에서 갖고갔음
     ret = batch[:len(args.cate_feats)-1]+batch[len(args.cate_feats)-1:len(batch)-2]
     ret.append(interaction)
     ret.append(mask)
     ret.append(gather_index)
-    print("모델로 넘기는 ret 출력",ret)
+    ret.append(correct)
+    # print("모델로 넘기는 ret 출력",ret)
     # print(f"최댓값 : {m}")
-    return tuple(ret) #tuple(cate + cont + interaction + mask + gather_index)
+    return tuple(ret) #tuple(cate + cont + interaction + mask + gather_index + correct)
 
 # 배치 전처리(기본 feature만 쓸 때, baseline)
 def process_batch(batch, args):

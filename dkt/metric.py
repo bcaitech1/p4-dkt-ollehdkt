@@ -5,7 +5,7 @@ def get_metric(targets, preds):
     auc = roc_auc_score(targets, preds)
     acc = accuracy_score(targets, np.where(preds >= 0.5, 1, 0))
     precision=precision_score(targets, np.where(preds >= 0.5, 1, 0))
-    recall=recall_score(label, np.where(preds >= 0.5, 1, 0))
-    f1=f1_score(label, np.where(preds >= 0.5, 1, 0))
+    recall=recall_score(targets, np.where(preds >= 0.5, 1, 0))
+    f1=f1_score(targets, np.where(preds >= 0.5, 1, 0))
     
     return auc, acc ,precision,recall,f1

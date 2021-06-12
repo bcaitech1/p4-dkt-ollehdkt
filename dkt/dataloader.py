@@ -87,11 +87,14 @@ class Preprocess:
                 le.classes_ = np.load(label_path)
                 
                 df[col] = df[col].apply(lambda x: x if x in le.classes_ else 'unknown')
-
+            #모든 컬럼이 범주형이라고 가정
+            df[col]= df[col].astype(str)
+            test = le.transform(df[col])
+            df[col] = test
             
         #cate feat들의 이름 / 고유값 개수를 dict로 conf에 저장
         self.args.cate_feat_dict=dict(zip(cate_cols,[len(df[col].unique()) for col in cate_cols]))
-        
+        print("preprocessing하고 나서 user개수",len(df['userID'].unique()))
         return df
 
     def __feature_engineering(self, df):
@@ -108,7 +111,7 @@ class Preprocess:
             print(df.columns)
 
             print('dataframe 확인')
-            print(df.loc[:3])
+            print(df)
 
             # drop_cols = ['_',"index","point","answer_min_count","answer_max_count","user_count",'sec_time'] # drop할 칼럼
             # for col in drop_cols:
@@ -127,10 +130,8 @@ class Preprocess:
         csv_file_path = os.path.join(self.args.data_dir, file_name)
         print(f'csv_file_path : {csv_file_path}')
         df = pd.read_csv(csv_file_path)
-        
+        print("load data 전",len(df['userID'].unique()))
         if self.args.model=='lgbm':
-            #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
-            # df['distance']=np.load('/opt/ml/np_train_tag_distance_arr.npy') if is_train else np.load('/opt/ml/np_test_tag_distance_arr.npy')
 
             df.sort_values(by=['userID','Timestamp'], inplace=True)
             return df
@@ -153,21 +154,22 @@ class Preprocess:
         ret.pop(len(self.args.cate_feats)-1)
         #맨뒤로 붙여줌
         ret.append('answerCode')
+        print("ret",ret)
         print("answercode의 순서 뒤로 변경",ret)
         group = df[columns].groupby('userID').apply(
                 lambda r: tuple([r[i].values for i in ret])
             )
-        
-        len(f'group.values->{len(group.values)}')
+        print(group)
+        # print(f"유저수 {len(group)} 피처수 {len(group[0])} 푼 문제 수 {len(group[0][0])}")
+        # len(f'group.values->{len(group.values)}')
+        print("load data 후",len(df['userID'].unique()))
         return group.values
 
 
     def load_train_data(self, file_name):
-        # self.train_data = self.load_data_from_file(file_name)
         self.train_data = self.load_data_from_file(file_name)
 
     def load_test_data(self, file_name):
-        # self.test_data = self.load_data_from_file(file_name, is_train= False)
         self.test_data = self.load_data_from_file(file_name,is_train=False)
 
 class MyDKTDataset(torch.utils.data.Dataset):
@@ -199,9 +201,6 @@ class MyDKTDataset(torch.utils.data.Dataset):
 
         # np.array -> torch.tensor 형변환
         for i, col in enumerate(columns):
-            print(i,"번째가 문제다")
-            print(len(col))
-            print(col.dtype)
             columns[i] = torch.tensor(col)
 
         return columns
@@ -239,7 +238,7 @@ class TestDKTDataset(torch.utils.data.Dataset):
 
         # np.array -> torch.tensor 형변환
         for i, col in enumerate(cate_cols):
-            cate_cols[i] = torch.tensor(col)
+            cate_cols[i] = torch.tensor(col.astype(int))
 
         return cate_cols
 
@@ -327,11 +326,7 @@ def get_loaders(args, train, valid):
         train_loader = torch.utils.data.DataLoader(trainset, num_workers=args.num_workers, shuffle=True,
                             batch_size=args.batch_size, pin_memory=pin_memory, collate_fn=collate)
     if valid is not None:
-        # valset = DKTDataset(valid, args)
-        # valset = DevDKTDataset(valid,args)
-        # valset = TestDKTDataset(valid,args)
         valset = MyDKTDataset(valid,args)
-        # print('inference gogo')
         valid_loader = torch.utils.data.DataLoader(valset, num_workers=args.num_workers, shuffle=False,
                             batch_size=args.batch_size, pin_memory=pin_memory, collate_fn=collate)
 

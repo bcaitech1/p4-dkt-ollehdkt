@@ -14,13 +14,13 @@ wandb :
         - baseline
 
 ##main params
-task_name: test
+task_name: lstm_time_test_nokfold
 seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
-file_name: train_time_fixed.csv
-test_file_name: test_time_fixed.csv
+file_name: train_time_finalfix.csv
+test_file_name: test_time_finalfix.csv
 
 asset_dir: asset/
 model_dir: models/
@@ -30,10 +30,10 @@ max_seq_len: 128
 num_workers: 1
 
 ##K-fold params
-use_kfold : True #n개의 fold를 이용하여 k-fold를 진행한다.
-use_stratify : True
+use_kfold : False #n개의 fold를 이용하여 k-fold를 진행한다.
+use_stratify : False
 n_fold : 5
-split_by_user : True #k-fold를 수행할 dataset을 user 기준으로 split
+split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
 hidden_dim : 256
