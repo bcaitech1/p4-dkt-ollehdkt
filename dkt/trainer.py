@@ -26,6 +26,8 @@ from sklearn.model_selection import StratifiedKFold
 
 import wandb
 
+import torch.cuda.amp
+
 def run(args, train_data, valid_data):
     lgbm_params=args.lgbm.model_params
     
@@ -241,24 +243,23 @@ def train(train_loader, model, optimizer, args):
 
     for step, batch in enumerate(train_loader):
         gc.collect()
-        # print(len(batch))
-        # input = process_batch(batch, args)
-        # input = process_batch_test(batch, args)
+        
+        
         if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
             or isinstance(model, TfixupSaint) or isinstance(model,LSTM) or isinstance(model, AutoEncoderLSTMATTN):
-            # print('process_batch_v2 사용')
-            # input = process_batch_v3(batch, args)
+            
             input = process_batch_v2(batch, args)
-        elif isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint):
-            # print('process_batch_v3 사용')
-            # print(type(batch))
+        elif isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint) or isinstance(model, GeneralizedSaintPlus)\
+            or isinstance(model,LastQuery):
+            
             input = process_batch_v3(batch,args)
         else:
             input = process_batch(batch,args)
         # print(f"input 텐서 사이즈 : {type(input)}, {len(input)}")
+        # with torch.cuda.amp.autocast():
         preds = model(input)
         # targets = input[3] # correct
-        targets = input[len(args.cate_cols)]
+        targets = input[len(args.cate_cols)].to(args.device)
         # print(f'targets : {targets}')
         # print(f'targets : {targets}')
 
@@ -301,11 +302,12 @@ def validate(valid_loader, model, args):
     total_targets = []
     for step, batch in enumerate(valid_loader):
         # input = process_batch(batch, args)
-        if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
+        if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post)\
              or isinstance(model, TfixupSaint) or isinstance(model, AutoEncoderLSTMATTN):
             input = process_batch_v2(batch, args)
-            # input = process_batch_v3(batch, args)
-        elif isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint):
+
+        elif isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint) or isinstance(model, GeneralizedSaintPlus)\
+        or isinstance(model,LastQuery):
             # print('process_batch_v3 사용 for validate')
             input = process_batch_v3(batch, args)
         else:
@@ -358,7 +360,8 @@ def inference(args, test_data):
     for step, batch in enumerate(test_loader):
         # input = process_batch(batch, args)
         # input = process_batch_test(batch,args)
-        if isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint):
+        if isinstance(model,GeneralizedLSTMConvATTN) or isinstance(model,GeneralizedSaint) or isinstance(model, LastQuery)\
+        or isinstance(model,GeneralizedSaintPlus):
             input = process_batch_v3(batch,args)
         else:
             input = process_batch_v2(batch,args)
@@ -452,12 +455,17 @@ def get_model(args):
         model = AutoEncoderLSTMATTN(args)
     # if args.model.lower() == 'mylstmconvattn' : model = MyLSTMConvATTN(args)
     if args.model.lower() == 'saint' : model = Saint(args)
-    if args.model.lower() == 'lastquery_post': model = LastQuery_Post(args)
-    if args.model.lower() == 'lastquery_pre' : model = LastQuery_Pre(args)
+    if args.model.lower() == 'lastquery_post': 
+        args.lq_padding = 'post'
+        model = LastQuery(args)
+    if args.model.lower() == 'lastquery_pre' : 
+        args.lq_padding = 'pre'
+        model = LastQuery(args)
     # if args.model.lower() == 'lastquery_post_test' : model = LastQuery_Post_TEST(args) # 개발중(deprecated)
     if args.model.lower() == 'tfixsaint' : model = TfixupSaint(args) # tfix-up을 적용한 Saint
     if args.model.lower() == 'generalizedlstmconvattn' or args.model.lower() == 'glstmconvattn' : model = GeneralizedLSTMConvATTN(args)
     if args.model.lower() == 'generalizedsaint' or args.model.lower() == 'gsaint': model = GeneralizedSaint(args)
+    if args.model.lower() == 'generallizedsaintplus' or args.model.lower() == 'gsaintplus' : model = GeneralizedSaintPlus(args)
 
     model.to(args.device)
 
@@ -499,7 +507,7 @@ def process_batch_v3(batch,args):
     
     # 연속형
     for i in range(len(args.cate_cols)+1,len(batch)-1):
-        new_batch[i-(len(args.cate_cols)+1)] = batch[i]
+        new_batch[i-(len(args.cate_cols)+1)] = batch[i].to(args.device)
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
@@ -513,8 +521,8 @@ def process_batch_v3(batch,args):
     gather_index = gather_index.to(args.device)
 
     # 기타 feature를 args의 device에 load
-    for i in range(len(new_batch)):
-        new_batch[i] = new_batch[i].to(args.device)
+    # for i in range(len(new_batch)):
+    #     new_batch[i] = new_batch[i].to(args.device)
         
 
     ret = []

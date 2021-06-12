@@ -27,9 +27,11 @@ if __name__ == "__main__":
     os.makedirs(args.model_dir, exist_ok=True)
 
     #train
-    t_main(args)
+    if args.run_train:
+        t_main(args)
     #inference
-    i_main(args)
+    if args.run_inference:
+        i_main(args)
 
 
     #save config_file as light_version

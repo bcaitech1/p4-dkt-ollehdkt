@@ -30,7 +30,7 @@ import gc
 import re
 
 # 공통 블럭
-class CommonModule:
+class CommonModule(nn.Module):
     def __init__(self,args):
         super(CommonModule,self).__init__()
         self.args=args # 입력한 argument
@@ -51,10 +51,10 @@ class CommonModule:
 
         self.concat_reverse = self.args.concat_reverse
         self.embedding_interaction = nn.Embedding(3,self.hidden_dim//2)
-        self.embedding_cate = [
+        self.embedding_cate = nn.ModuleList([
             nn.Embedding(v+1,self.hidden_dim//2)
             for k,v in self.args.cate_dict.items()
-        ]
+        ])
         self.n_heads=args.n_heads
         
         # 범주형 hidden dimension 공식
@@ -73,6 +73,10 @@ class CommonModule:
         self.fc = nn.Linear((self.hidden_dim//2)*(self.n_cate_cols), 1)
         self.activation = nn.Sigmoid()
 
+    def chk_type(self, cols):
+        for i in cols:
+            print(i.dtype)
+
     # input을 받고, 범주형 임베딩, 연속형을 각각 다른 레이어를 거친 후 concat
     def embed(self,input):
         # input의 순서는 (범주형),(mask),(interaction),(연속형),(gather_index)
@@ -86,8 +90,10 @@ class CommonModule:
         gather_index = input[-1]
         batch_size = len(input[0])
 
+        # self.chk_type(cate_cols) # type check
 
         embed_interaction = self.embedding_interaction(interaction)
+
         embed_cate = [self.embedding_cate[i](cate_cols[i]) 
         for i in range(len(cate_cols))]
 
@@ -101,113 +107,244 @@ class CommonModule:
             embed_cont = None
         # del input
         gc.collect()
-        # print(f'intercation : {interaction.shape}')
+        # embed_cate의 차원 : (bs, mas_seq_len, hidden//2)
+        # return
+        # (임베딩된 범주형 feature), mask, (임베딩 된 정답여부), (임베딩 된 연속형), gather_index
         return embed_cate,mask,embed_interaction,embed_cont,gather_index
 
     def future_mask(self,max_seq_len):
         future_mask = np.triu(np.ones((max_seq_len, max_seq_len)), k=1).astype('bool')
         return torch.from_numpy(future_mask)
 
+######## Last Query
+class LastQuery(nn.Module):
+    def __init__(self, args):
+        super(LastQuery, self).__init__()
+        self.args = args
+        self.device = args.device
+        self.cm = CommonModule(args)
+        self.hidden_dim = self.cm.hidden_dim//2
+
+        # 범주형 임베딩을 projection이나, q,k,v 에 쓰일 예정
+        self.hidden_dim_used =  (self.hidden_dim)*(len(self.cm.cate_cols)) # (입력 hidden_dim)//2 * (범주형 컬럼 수)
+
+        # Embedding 
+        # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
+        self.embedding_interaction = self.cm.embedding_interaction
+        self.embedding_cate = self.cm.embedding_cate
+        self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim)
+        
+        # encoder combination projection
+        self.cate_proj = nn.Linear(self.hidden_dim_used, self.hidden_dim_used)
+
+
+        # 기존 keetar님 솔루션에서는 Positional Embedding은 사용되지 않습니다
+        # 하지만 사용 여부는 자유롭게 결정해주세요 :)
+        # Position-Embedding 사용여부
+        self.is_position_embedding = False
+        self.embedding_position = nn.Embedding(self.args.max_seq_len, self.hidden_dim_used)
+        
+        # Encoder
+        self.query = nn.Linear(in_features=self.hidden_dim_used, out_features=self.hidden_dim_used)
+        self.key = nn.Linear(in_features=self.hidden_dim_used, out_features=self.hidden_dim_used)
+        self.value = nn.Linear(in_features=self.hidden_dim_used, out_features=self.hidden_dim_used)
+
+        self.attn = nn.MultiheadAttention(embed_dim=self.hidden_dim_used, num_heads=self.args.n_heads, dropout=self.cm.drop_out)
+        self.mask = None # last query에서는 필요가 없지만 수정을 고려하여서 넣어둠
+        self.ffn = FFN(self.args,self.hidden_dim_used)      
+
+        self.ln1 = nn.LayerNorm(self.hidden_dim_used)
+        self.ln2 = nn.LayerNorm(self.hidden_dim_used)
+
+        # LSTM
+        self.lstm = nn.LSTM(
+            self.hidden_dim_used,
+            self.hidden_dim_used,
+            self.args.n_layers,
+            batch_first=True)
+
+        # Fully connected layer
+        self.fc = nn.Linear(self.hidden_dim_used, 1)
+       
+        self.activation = nn.Sigmoid()
+
+    def get_mask(self, seq_len, index, batch_size):
+        """
+        batchsize * n_head 수만큼 각 mask를 반복하여 증가시킨다
+        
+        참고로 (batch_size*self.args.n_heads, seq_len, seq_len) 가 아니라
+              (batch_size*self.args.n_heads,       1, seq_len) 로 하는 이유는
+        
+        last query라 output의 seq부분의 사이즈가 1이기 때문이다
+        """
+        # [[1], -> [1, 2, 3]
+        #  [2],
+        #  [3]]
+        index = index.view(-1)
+
+        # last query의 index에 해당하는 upper triangular mask의 row를 사용한다
+        mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1))
+        mask = mask[index]
+
+        # batchsize * n_head 수만큼 각 mask를 반복하여 증가시킨다
+        mask = mask.repeat(1, self.args.n_heads).view(batch_size*self.args.n_heads, -1, seq_len)
+        return mask.masked_fill(mask==1, float('-inf'))
+
+    def get_pos(self, seq_len):
+        # use sine positional embeddinds
+        return torch.arange(seq_len).unsqueeze(0)
+ 
+    def init_hidden(self, batch_size, hidden_dim):
+        h = torch.zeros(
+            self.args.n_layers,
+            batch_size,
+            hidden_dim)
+        h = h.to(self.device)
+
+        c = torch.zeros(
+            self.args.n_layers,
+            batch_size,
+            hidden_dim)
+        c = c.to(self.device)
+
+        return (h, c)
+
+
+    def forward(self, input):
+
+        # test, question, tag, _, mask, interaction, index = input
+
+        # batch, seq_len 설정
+        batch_size = input[0].size(0)
+        seq_len = input[0].size(1)
+        
+        #common module 참고
+        embed_cate,mask,embed_interaction,embed_cont,gather_index = self.cm.embed(input)
+
+        # 신나는 embedding -> 그런거 없다
+        embed = torch.cat(embed_cate, 2)
+        # print(embed.shape)
+        embed = self.cate_proj(embed)
+
+        # Positional Embedding
+        # last query에서는 positional embedding을 하지 않음
+        if self.is_position_embedding: # 기본값은 False
+            position = self.get_pos(seq_len).to(self.args.device)
+            embed_pos = self.embedding_position(position)
+            embed = embed + embed_pos
+
+        ####################### ENCODER #####################
+
+        if self.args.lq_padding=='post':
+
+            q = self.query(embed)
+
+            # 이 3D gathering은 머리가 아픕니다. 잠시 머리를 식히고 옵니다.
+            q = torch.gather(q, 1, gather_index.repeat(1, self.hidden_dim).unsqueeze(1))
+            q = q.permute(1, 0, 2)
+
+            k = self.key(embed).permute(1, 0, 2)
+            v = self.value(embed).permute(1, 0, 2)
+
+            ## attention
+            # last query only
+            self.mask = self.get_mask(seq_len, index, batch_size).to(self.device)
+            out, _ = self.attn(q, k, v, attn_mask=self.mask)
+        elif self.args.lq_padding=='pre':
+            q = self.query(embed).permute(1, 0, 2)
+            q = self.query(embed)[:, -1:, :].permute(1, 0, 2)
+
+            k = self.key(embed).permute(1, 0, 2)
+            v = self.value(embed).permute(1, 0, 2)
+
+            ## attention
+            # last query only
+            out, _ = self.attn(q, k, v)
+
+        ## residual + layer norm
+        out = out.permute(1, 0, 2)
+        out = embed + out
+        out = self.ln1(out)
+
+        ## feed forward network
+        out = self.ffn(out)
+
+        ## residual + layer norm
+        out = embed + out
+        out = self.ln2(out)
+
+        ###################### LSTM #####################
+        hidden = self.init_hidden(batch_size, self.hidden_dim_used)
+        out, hidden = self.lstm(out, hidden)
+
+        ###################### DNN #####################
+
+        out = out.contiguous().view(batch_size, -1, self.hidden_dim_used)
+        out = self.fc(out)
+
+        preds = self.activation(out).view(batch_size, -1)
+
+        return preds
 
 '''
 src = "https://www.kaggle.com/gannonreynolds/saint-riid-0-798"
 '''
 class FFN(nn.Module):
-    def __init__(self, hidden_dim=128):
+    def __init__(self, args, hidden_dim=128):
         super().__init__()
         self.layer1 = nn.Linear(hidden_dim, hidden_dim)
         self.layer2 = nn.Linear(hidden_dim, hidden_dim)
         self.relu = nn.ReLU()
+        self.drop_out_layer = nn.Dropout(args.drop_out)
     
     def forward(self, x):
-        return self.layer2(   self.relu(   self.layer1(x)))
-
-class Encoder(nn.Module):
-    def __init__(self, n_in, seq_len=100, embed_dim=128, nheads=4):
-        super().__init__()
-        self.seq_len = seq_len
-
-        self.part_embed = nn.Embedding(10, embed_dim)
-        
-        self.e_embed = nn.Embedding(n_in, embed_dim)
-        self.e_pos_embed = nn.Embedding(seq_len, embed_dim)
-        self.e_norm = nn.LayerNorm(embed_dim)
-        
-        self.e_multi_att = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=nheads, dropout=0.2)
-        self.m_norm = nn.LayerNorm(embed_dim)
-        self.ffn = FFN(embed_dim)
-    
-    def forward(self, e, p, first_block=True):
-        
-        if first_block:
-            e = self.e_embed(e)
-            p = self.part_embed(p)
-            e = e + p
-         
-        pos = torch.arange(self.seq_len).unsqueeze(0).to(device)
-        e_pos = self.e_pos_embed(pos)
-        e = e + e_pos
-        e = self.e_norm(e)
-        e = e.permute(1,0,2) #[bs, s_len, embed] => [s_len, bs, embed]     
-        n = e.shape[0]
-        
-        att_mask = future_mask(n).to(device)
-        att_out, _ = self.e_multi_att(e, e, e, attn_mask=att_mask)
-        m = e + att_out
-        m = m.permute(1,0,2)
-        
-        o = m + self.ffn(self.m_norm(m))
-        
-        return o
+        x = self.layer1(x)
+        x = self.relu(x)
+        x = self.layer2(x)
+        return self.drop_out_layer(x)
 
 class GeneralizedSaintPlus(nn.Module):
     
     def __init__(self, args):
-        super(GeneralizedSaint, self).__init__()
-        
+        super(GeneralizedSaintPlus, self).__init__()
+        self.args = args
         self.cm = CommonModule(args)
         self.device = self.cm.device
+        self.max_seq_len = self.cm.args.max_seq_len
         self.drop_out = self.cm.drop_out
         self.n_layers = self.cm.n_layers
-        # encoder combination projection
-        self.enc_comb_proj = nn.Sequential(
-                                    nn.Linear((self.cm.hidden_dim//2)*
-                                    (self.cm.n_cate_cols), (self.cm.hidden_dim//2)*(self.cm.n_cate_cols)),
-                                    # nn.LayerNorm(self.cm.hidden_dim)
-                            )
 
-        # DECODER embedding
-        # decoder combination projection
-        self.dec_comb_proj = nn.Sequential(
-                                    nn.Linear((self.cm.hidden_dim//2)*
-                                    (self.cm.n_cate_cols+1), (self.cm.hidden_dim//2)*(self.cm.n_cate_cols)),
-                                    # nn.LayerNorm(self.cm.hidden_dim)
-                            )
-
+        self.pos_embedding = nn.Embedding(self.max_seq_len,self.cm.hidden_dim//2)
         # Positional encoding
         self.pos_encoder = PositionalEncoding((self.cm.hidden_dim//2)*(self.cm.n_cate_cols), self.drop_out, self.cm.max_seq_len)
         self.pos_decoder = PositionalEncoding((self.cm.hidden_dim//2)*(self.cm.n_cate_cols), self.drop_out, self.cm.max_seq_len)
 
         self.transformer = nn.Transformer(
-            d_model=(self.cm.hidden_dim//2)*(self.cm.n_cate_cols),
+            d_model=(self.cm.hidden_dim//2)*1,
             nhead=self.cm.n_heads,
             num_encoder_layers=self.n_layers, 
-            num_decoder_layers=self.n_layers, 
-            dim_feedforward=self.cm.hidden_dim, 
+            num_decoder_layers=self.n_layers,
             dropout=self.drop_out, 
             activation='relu')
 
-        self.fc = self.cm.fc # Linear Layer
+        self.drop_out_layer = nn.Dropout(self.drop_out)
+        self.fc = nn.Linear(self.cm.hidden_dim//2,1) # Linear Layer
         self.activation = self.cm.activation
+        self.layer_norm = nn.LayerNorm((self.cm.hidden_dim//2)*1)
+        self.ffn = FFN(self.cm.args,(self.cm.hidden_dim//2)*1)
 
         self.enc_mask = None
         self.dec_mask = None
         self.enc_dec_mask = None
-    
-    def get_mask(self, seq_len):
-        mask = torch.from_numpy(np.triu(np.ones((seq_len, seq_len)), k=1))
 
-        return mask.masked_fill(mask==1, float('-inf'))
+        # 차원 측정용
+        self.flag = False
+    
+    def get_mask(self, max_seq_len):
+        
+        future_mask = np.triu(np.ones((max_seq_len, max_seq_len)), k=1).astype('bool')
+        
+        return torch.from_numpy(future_mask)
 
     def forward(self, input):
 
@@ -217,19 +354,33 @@ class GeneralizedSaintPlus(nn.Module):
         
         #common module 참고
         embed_cate,mask,embed_interaction,embed_cont,gather_index = self.cm.embed(input)
-        
-        embed_cate_enc = torch.cat(embed_cate, 2)
 
-        embed_enc = self.enc_comb_proj(embed_cate_enc)
+        pos_id = torch.arange(seq_len).unsqueeze(0) # 1, max_seq_len
+        tmp = [pos_id for i in range(batch_size)]
+        pos_id = torch.cat(tmp,0)
+        del tmp
+        del embed_cont
+        pos_id=pos_id.to(self.device)
+        pos_id = self.pos_embedding(pos_id)
+
+        if not self.flag:
+            self.flag = True
+            # print(f'pos_id_shape : {pos_id.shape}')
+            # print(f'embed_cat : {embed_cate[0].shape}')
+
+        enc = pos_id
+        dec = pos_id
+        
+        for cate in embed_cate[:len(embed_cate)-1]:
+            enc += cate
         
         # DECODER
-        embed_cate_col = embed_cate
 
-        cat_list = list(embed_cate_col)
+        # cat_list = list(embed_cate)
+        cat_list = list(embed_cate[len(embed_cate)-1:])
         cat_list.append(embed_interaction)
-        
-        embed_dec = torch.cat(cat_list, 2)
-        embed_dec = self.dec_comb_proj(embed_dec)
+        for cate in cat_list:
+            dec +=cate
         del cat_list
 
         # ATTENTION MASK 생성
@@ -245,27 +396,29 @@ class GeneralizedSaintPlus(nn.Module):
             self.enc_dec_mask = self.get_mask(seq_len).to(self.device)
             
   
-        embed_enc = embed_enc.permute(1, 0, 2)
+        embed_enc = enc.permute(1, 0, 2)
         # print(f'embed_enc shape: {embed_enc.shape}')
-        embed_dec = embed_dec.permute(1, 0, 2)
+        embed_dec = dec.permute(1, 0, 2)
         # print(f'embed_dec shape: {embed_dec.shape}')
-        
-        # Positional encoding
-        embed_enc = self.pos_encoder(embed_enc)
-        embed_dec = self.pos_decoder(embed_dec)
         
         out = self.transformer(embed_enc, embed_dec,
                                src_mask=self.enc_mask,
                                tgt_mask=self.dec_mask,
                                memory_mask=self.enc_dec_mask)
-
+        # out = self.layer_norm(out)
         out = out.permute(1, 0, 2)
-        out = out.contiguous().view(batch_size, -1, (self.cm.hidden_dim//2)*(self.cm.n_cate_cols))
-        out = self.fc(out)
+        # out = out.contiguous().view(batch_size, -1, (self.cm.hidden_dim//2)*(self.cm.n_cate_cols))
+        x = self.ffn(out)
+        # x = self.layer_norm(x+out)
+        x=x+out
+        # print(f'{x.shape}')
+        out = self.fc(x)
 
         preds = self.activation(out).view(batch_size, -1)
 
         return preds
+        # print(out.squeeze(-1))
+        # return out.squeeze(-1)
 
 
 # Saint Positional Encoding

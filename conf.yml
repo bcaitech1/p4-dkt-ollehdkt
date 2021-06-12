@@ -1,4 +1,8 @@
-model : gsaint # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn,gLSTMConvATTN}
+work : 'train_and_inference' # 'train_and_inference','tuning'
+
+# 모델 : 일반화된 모델을 사용하고 싶으면, g를 붙일 것
+# 미 일반화된 모델 : LSTM, Bert
+model : lastquery_pre # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery_pre,lastquery_post, saint, lstmalbertattn,gLSTMConvATTN, gsaint, gsaintplus}
  
 # (비일반화) : base feature만 사용
 # - lstm,lstmattn,bert
@@ -6,31 +10,33 @@ model : gsaint # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lst
 
 wandb :
     using: False
-    project: DKT
+    project: DKT-slidding-Window
 
     ## 자신의 wandb 아이디를 적어주세요
-    entity: pomdeyo
+    entity: sangki930
     tags: 
         - baseline
 
 ##main params
-task_name: target_check
+task_name: slidding_window_max_seq_len_32
 seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
 # file_name: train_data.csv
 # file_name : time_train.csv
-file_name : train_inter_time (1).csv
+# file_name : train_inter_time (1).csv
+file_name : train_time_finalfix.csv
 # test_file_name: test_data.csv
 # test_file_name : time_test.csv
-test_file_name : test_inter_time (1).csv
+# test_file_name : test_inter_time (1).csv
+test_file_name : test_time_finalfix.csv
 
 asset_dir: asset/
 model_dir: models/
 output_dir: output/
 
-max_seq_len: 20
+max_seq_len: 32
 num_workers: 1
 
 ##K-fold params
@@ -40,14 +46,14 @@ n_fold : 5
 split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
-hidden_dim : 128
+hidden_dim : 256
 n_layers : 4
-n_heads : 4
-drop_out: 0
+n_heads : 8
+drop_out: 0.5
 
 # Augmentation
 window : False # 슬라이딩 윈도우를 사용할 것인지
-stride : 20
+stride : 10
 shuffle : True
 shuffle_n : 3
 
@@ -55,11 +61,11 @@ shuffle_n : 3
 concat_reverse : False
 
 #train
-n_epochs: 20
-batch_size: 1024
-lr: 0.0001
+n_epochs: 1
+batch_size: 2048
+lr: 0.0005
 clip_grad : 10
-patience : 20
+patience : 50
 log_steps : 50
 split_ratio : 0.8
 
@@ -94,4 +100,7 @@ lgbm:
 make_sharing_feature : True #extract statistics featrue from train + test(except last rows)
 use_test_data : True #use test_data for train
 
-## model_list
+## train && inference
+
+run_train : True
+run_inference : True
