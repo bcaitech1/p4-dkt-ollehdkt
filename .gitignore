@@ -5,10 +5,12 @@ wandb
 src
 output
 
+#files
+.args.py
 #add when u clone this file
 conf.yml
 # README.md
-.gitignore
+# .gitignore
 NanumGothic.ttf
 #etc
 /.ipynb_checkpoints
