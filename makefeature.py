@@ -20,6 +20,7 @@ from collections import defaultdict
 from lgbm_utils import *
 
 def make_feature(args,df):
+    
     # 유저가 푼 시험지에 대해, 유저의 전체 정답/풀이횟수/정답률 계산 (3번 풀었으면 3배)
     df_group = df.groupby(['userID','testId'])['answerCode']
     df['user_total_correct_cnt'] = df_group.transform(lambda x: x.cumsum().shift(1))
@@ -31,28 +32,28 @@ def make_feature(args,df):
     #문제번호
     df['problem_number']=df['assessmentItemID'].apply(lambda x:str(x[-3:]))
 
-    # group_list=['userID']
-    # uid_agg_dict={
-    #     'solve_time' :['mean','std','skew'],
-    # }
+    group_list=['userID']
+    uid_agg_dict={
+        'solve_time' :['mean','std','skew'],
+    }
     
-    # agg_dict_list=[uid_agg_dict]
+    agg_dict_list=[uid_agg_dict]
     
     
-    # for group, now_agg in zip(group_list,agg_dict_list):
-    #     grouped_df=df.groupby(group).agg(now_agg)
-    #     new_cols = []
-    #     for col in now_agg.keys():
-    #         for stat in now_agg[col]:
-    #             if type(stat) is str:
-    #                 new_cols.append(f'{group}-{col}-{stat}')
-    #             else:
-    #                 new_cols.append(f'{group}-{col}-mode')
+    for group, now_agg in zip(group_list,agg_dict_list):
+        grouped_df=df.groupby(group).agg(now_agg)
+        new_cols = []
+        for col in now_agg.keys():
+            for stat in now_agg[col]:
+                if type(stat) is str:
+                    new_cols.append(f'{group}-{col}-{stat}')
+                else:
+                    new_cols.append(f'{group}-{col}-mode')
 
-    #     grouped_df.columns = new_cols
+        grouped_df.columns = new_cols
 
-    #     grouped_df.reset_index(inplace = True)
-    #     df = df.merge(grouped_df, on=group, how='left')
+        grouped_df.reset_index(inplace = True)
+        df = df.merge(grouped_df, on=group, how='left')
     #delete null
     df.isnull().sum()
     df = df.fillna(0)

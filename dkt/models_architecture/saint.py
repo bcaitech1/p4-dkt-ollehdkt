@@ -76,7 +76,10 @@ class Saint(nn.Module):
 
         # comb linear
         self.cate_comb_proj = nn.Linear(((self.hidden_dim)//cate_len)*(cate_len+1), self.hidden_dim) #interaction을 나중에 더하므로 +1
-        self.cont_comb_proj = nn.Linear(((self.hidden_dim)//cont_len)*cont_len, self.hidden_dim)
+        self.cont_comb_proj = nn.Sequential(
+            nn.Linear(((self.hidden_dim)//cont_len)*cont_len, self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim)
+        )
 
         # Positional encoding
         self.pos_encoder = PositionalEncoding(self.hidden_dim, self.dropout, self.args.max_seq_len)

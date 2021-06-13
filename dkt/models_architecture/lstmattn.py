@@ -46,8 +46,10 @@ class LSTMATTN(nn.Module):
         # cate Embedding 
         self.cate_embedding_list = nn.ModuleList([nn.Embedding(max_val+1, (self.hidden_dim//2)//cate_len) for max_val in list(args.cate_feat_dict.values())[1:]]) 
         # cont Embedding
-        self.cont_embedding = nn.Linear(1, (self.hidden_dim//2)//cont_len)
-
+        self.cont_embedding = nn.Sequential(
+            nn.Linear(1, (self.hidden_dim//2)//cont_len),
+            nn.LayerNorm((self.hidden_dim//2)//cont_len)
+        )
         # comb linear
         self.cate_comb_proj = nn.Linear(((self.hidden_dim//2)//cate_len)*(cate_len+1), self.hidden_dim//2) #interaction을 나중에 더하므로 +1
         self.cont_comb_proj = nn.Linear(((self.hidden_dim//2)//cont_len)*cont_len, self.hidden_dim//2)
