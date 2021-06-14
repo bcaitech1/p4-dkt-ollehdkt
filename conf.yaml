@@ -19,8 +19,12 @@ seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
+
+# For training files 
 file_name: train_time_finalfix.csv
-test_train_file_name : test_month.csv
+test_train_file_name : test_time_finalfix2.csv
+
+# For predicting files
 test_file_name: test_time_finalfix.csv
 
 asset_dir: asset/
