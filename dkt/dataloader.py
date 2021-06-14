@@ -130,22 +130,20 @@ class Preprocess:
         print(f'csv_file_path : {csv_file_path}')
         df = pd.read_csv(csv_file_path)
         print("load data 전 유저 수",len(df['userID'].unique()))
+        if self.args.model=='lgbm':
+    
+            df.sort_values(by=['userID','Timestamp'], inplace=True)
+            return df
 
         if is_train and self.args.user_split_augmentation:
             #종호님의 유저 split augmentation
             df['Timestamp']=pd.to_datetime(df['Timestamp'].values)
             df['month'] = df['Timestamp'].dt.month
             # df['userID'] = (df['userID'].map(str)+'0'+df['month'].map(str)).astype('int32')
-            df['userID'] = (df['userID'].map(str)+'-'+df['month'].map(str)).astype('int32')
+            df['userID'] = (df['userID'].map(str)+'0'+df['month'].map(str)).astype('int32')
             df.drop(columns=['month'],inplace=True)
             print("user_augmentation 후 유저 수",len(df['userID'].unique()))
         
-        if self.args.model=='lgbm':
-
-            df.sort_values(by=['userID','Timestamp'], inplace=True)
-            return df
-
-
         #둘은 int로 돼있어서 cate_col로 분류되도록 미리 형변환
         df['userID']=df['userID'].astype(str)
         df['KnowledgeTag']=df['KnowledgeTag'].astype(str)

@@ -383,7 +383,7 @@ def make_lgb_user_oof_prediction(args, train, test, features, categorical_featur
         # y_oof[fold] = val_preds
         
         # 폴드별 Validation 스코어 측정
-        fold_auc, fold_acc ,fold_precision,fold_recall,fold_f1 = get_metric(y_val, list(map(round,val_preds)))
+        fold_auc, fold_acc ,fold_precision,fold_recall,fold_f1 = get_metric(y_val, val_preds)
     
         print(f"Fold {fold + 1} | AUC: {fold_auc} | ACC: {fold_acc} | Precision: {fold_precision} | Recall: {fold_recall} | f1: {fold_f1}")
         print('-'*80)

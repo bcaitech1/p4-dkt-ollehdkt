@@ -126,6 +126,15 @@ def run_kfold(args, train_data):
  
         if args.use_test_data:#test의 데이터까지 사용할 경우
             train_df=make_sharing_feature(args)
+        
+        if args.user_split_augmentation:
+            #종호님의 유저 split augmentation
+            train_df['Timestamp']=pd.to_datetime(train_df['Timestamp'].values)
+            train_df['month'] = train_df['Timestamp'].dt.month
+            # df['userID'] = (df['userID'].map(str)+'0'+df['month'].map(str)).astype('int32')
+            train_df['userID'] = (train_df['userID'].map(str)+'0'+train_df['month'].map(str)).astype('int32')
+            train_df.drop(columns=['month'],inplace=True)
+            print("user_augmentation 후 유저 수",len(train_df['userID'].unique()))
             
         train_df=make_lgbm_feature(args,train_df)
 
@@ -260,7 +269,7 @@ def run_kfold(args, train_data):
 
         oof[valid_idx] = best_preds
 
-    
+
     print(f"Valid AUC : {val_auc:.5f}, accuracy : {val_acc:.5f}, precision : {val_precision:.5f}, recall : {val_recall:.5f}, f1 : {val_f1:.5f}")
 
 

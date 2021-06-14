@@ -16,7 +16,7 @@ from inference import main as i_main
 
 if __name__ == "__main__":
 
-    with open('/opt/ml/code/conf.yml') as f:
+    with open('/opt/ml/code/conf.yaml') as f:
         cf = yaml.load(f, Loader=yaml.FullLoader)
     args = AttrDict(cf)
     
