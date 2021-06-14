@@ -140,7 +140,7 @@ class Preprocess:
             df['Timestamp']=pd.to_datetime(df['Timestamp'].values)
             df['month'] = df['Timestamp'].dt.month
             # df['userID'] = (df['userID'].map(str)+'0'+df['month'].map(str)).astype('int32')
-            df['user_id'] = df['userID'].map(str)+'-'+df['month'].map(str)
+            df['userID'] = df['userID'].map(str)+'-'+df['month'].map(str)
             df.drop(columns=['month'],inplace=True)
             print("user_augmentation 후 유저 수",len(df['userID'].unique()))
         
@@ -153,7 +153,7 @@ class Preprocess:
         df = self.__feature_engineering(df)
         df = self.__preprocessing(df, is_train)
 
-        df['userID']=df['userID'].astype(int)
+        # df['userID']=df['userID'].astype(int)
         df['KnowledgeTag']=df['KnowledgeTag'].astype(int)
         
 
