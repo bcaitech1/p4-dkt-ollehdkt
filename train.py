@@ -13,8 +13,8 @@ import wandb
 
 
 def main(args):
-    wandb.init(project=args.wandb.project, entity=args.wandb.entity)
-    wandb.run.name = args.task_name
+    # wandb.init(project=args.wandb.project, entity=args.wandb.entity)
+    # wandb.run.name = args.task_name
     
     setSeeds(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -22,12 +22,16 @@ def main(args):
 
     preprocess = Preprocess(args)
     preprocess.load_train_data(args.file_name)
-    train_data = preprocess.get_train_data()
+    train_data, train_uid_df = preprocess.get_train_data()
+
+    preprocess.load_train_data(args.test_train_file_name)
+    test_train_data, _ = preprocess.get_train_data()
+
     
     # train_data, valid_data = preprocess.split_data(train_data)
     # trainer.run(args, train_data, valid_data)
 
-    trainer.run_kfold(args, train_data)
+    trainer.run_kfold(args, train_data, test_train_data, train_uid_df)
     
 
 if __name__ == "__main__":

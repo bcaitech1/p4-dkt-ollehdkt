@@ -1,18 +1,21 @@
 import os
-import gc
-import json
+from numpy.lib.arraysetops import isin
 import torch
 import numpy as np
-import pandas as pd
-
+import json
+import gc
 from tqdm.auto import tqdm
+
 from .dataloader import get_loaders
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .criterion import get_criterion
 from .metric import get_metric
+import wandb
+
 from .model import *
 from lgbm_utils import *
+from .new_model import Bert,LSTMATTN
 
 import lightgbm as lgb
 from sklearn.metrics import roc_auc_score
@@ -28,16 +31,17 @@ def run(args, train_data, valid_data):
     
     train_loader, valid_loader = get_loaders(args, train_data, valid_data)
     
-    ### LGBM runner
-
+    #lgbm은 학습과 추론을 함께함
     if args.model=='lgbm':
-        #학습
+        print("k-fold를 사용하지 않습니다","-"*80)
         model,auc,acc=lgbm_train(args,train_data,valid_data)
-        wandb.log({"valid_auc":auc, "valid_acc":acc})
+        if args.wandb.using:
+            wandb.log({"valid_auc":auc, "valid_acc":acc})
         #추론준비
         csv_file_path = os.path.join(args.data_dir, args.test_file_name)
         test_df = pd.read_csv(csv_file_path)#, nrows=100000)
-        test_df = make_lgbm_feature(test_df)
+
+        test_df = make_lgbm_feature(args,test_df)
         #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
         test_df.sort_values(by=['userID','Timestamp'], inplace=True)
         test_df=lgbm_make_test_data(test_df)
@@ -45,12 +49,12 @@ def run(args, train_data, valid_data):
         lgbm_inference(args,model,test_df)
         return
         
-        
     # only when using warmup scheduler
     args.total_steps = int(len(train_loader.dataset) / args.batch_size) * (args.n_epochs)
     args.warmup_steps = args.total_steps // 10
             
     model = get_model(args)
+#     model = get_model(args,args.model)
     optimizer = get_optimizer(model, args)
     scheduler = get_scheduler(optimizer, args)
 
@@ -67,7 +71,8 @@ def run(args, train_data, valid_data):
         auc, acc,_ , _ = validate(valid_loader, model, args)
 
         ### TODO: model save or early stopping
-        wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
+        if args.wandb.using:
+            wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
                   "valid_auc":auc, "valid_acc":acc})
         if auc > best_auc:
             best_auc = auc
@@ -77,6 +82,7 @@ def run(args, train_data, valid_data):
                 'epoch': epoch + 1,
                 'state_dict': model_to_save.state_dict(),
                 },
+
                 args.model_dir, f'{args.task_name}.pt',
             )
             early_stopping_counter = 0
@@ -92,53 +98,76 @@ def run(args, train_data, valid_data):
         else:
             scheduler.step()
 
-
-def run_kfold(args, train_data, test_train_data ,train_uid_df):
+def run_kfold(args, train_data):
     n_splits = args.n_fold
+    print("k-fold를 사용합니다","-"*80)
+    ### LGBM runner
+    if args.model=='lgbm':
+        
+        csv_file_path = os.path.join(args.data_dir, args.file_name)
+        train_df = pd.read_csv(csv_file_path)#, nrows=100000)
+        
+        csv_file_path = os.path.join(args.data_dir, args.test_file_name)
+        test_df = pd.read_csv(csv_file_path)#, nrows=100000)
+        
+        if args.use_test_data:#test의 데이터까지 사용할 경우
+            train_df=make_sharing_feature(args)
+            
+        train_df=make_lgbm_feature(args,train_df)
+        test_df=make_lgbm_feature(args,test_df)
+        
+        delete_feats=['userID','assessmentItemID','testId','answerCode','Timestamp','sec_time']
+        features=list(set(test_df.columns)-set(delete_feats))
+
+        print(f'사용한 피처는 다음과 같습니다')
+        print(features)
+
+        if args.split_by_user: #유저별로 train/valid set을 나눌 때
+            y_oof,pred,fi,score,acc=make_lgb_user_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
+            if args.wandb.using:
+                wandb.log({"valid_auc":score, "valid_acc":acc})
+        else : #skl split라이브러리를 이용하여 유저 구분없이 나눌 때 
+            y_oof,pred,fi=make_lgb_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
+        
+        
+        new_output_path=f'{args.output_dir}{args.task_name}'
+        write_path = os.path.join(new_output_path, "output.csv")
+        if not os.path.exists(new_output_path):
+            os.makedirs(new_output_path)    
+        with open(write_path, 'w', encoding='utf8') as w:
+            print("writing prediction : {}".format(write_path))
+            w.write("id,prediction\n")
+            for id, p in enumerate(pred):
+                w.write('{},{}\n'.format(id,p))
+
+        print(f"lgbm의 예측파일이 {new_output_path}/{args.task_name}.csv 로 저장됐습니다.")
+
+        save_path=f"{args.output_dir}{args.task_name}/feature{len(features)}_config.json"
+        json.dump(
+            features,
+            open(save_path, "w"),
+            indent=2,
+            ensure_ascii=False,
+        )
+        return
+
 
     if args.use_stratify == True:
         kfold = StratifiedKFold(n_splits=n_splits, shuffle=True)
     else:
         kfold = KFold(n_splits=n_splits, shuffle=True)
-
-    ### LGBM runner
-    if args.model=='lgbm':
-        lgbm_params=args.lgbm.model_params
-
-        for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data)):
-            train_data, valid_data = train_data[train_idx], train_data[valid_idx]
-
-            #학습
-            model,auc,acc=lgbm_train(args,train_data,valid_data)
-            wandb.log({"valid_auc":auc, "valid_acc":acc})
-            #추론준비
-            csv_file_path = os.path.join(args.data_dir, args.test_file_name)
-            test_df = pd.read_csv(csv_file_path)#, nrows=100000)
-            test_df = make_lgbm_feature(test_df)
-            #유저별 시퀀스를 고려하기 위해 아래와 같이 정렬
-            test_df.sort_values(by=['userID','Timestamp'], inplace=True)
-            test_df=lgbm_make_test_data(test_df)
-            #추론
-            lgbm_inference(args,model,test_df)
-            
-        
-        return
     
 
     target = get_target(train_data)
-
     val_auc = 0
     val_acc = 0
 
     oof = np.zeros(train_data.shape[0])
-    oof_target = np.zeros(train_data.shape[0])
 
     for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data, target)):
+        print(f'{fold}fold를 수행합니다')
         trn_data = train_data[train_idx]
         val_data = train_data[valid_idx]
-
-        # test data 중 일부 추가
-        trn_data = np.concatenate([trn_data, test_train_data])
         
         train_loader, valid_loader = get_loaders(args, trn_data, val_data)
 
@@ -163,11 +192,13 @@ def run_kfold(args, train_data, test_train_data ,train_uid_df):
             train_auc, train_acc, train_loss = train(train_loader, model, optimizer, args)
             
             ### VALID
-            auc, acc, preds, targets = validate(valid_loader, model, args)
+            auc, acc, preds , _ = validate(valid_loader, model, args)
 
             ### TODO: model save or early stopping
-            # wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
-            #         "valid_auc":auc, "valid_acc":acc})
+            if args.wandb.using:
+                wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
+                    "valid_auc":auc, "valid_acc":acc})
+
             if auc > best_auc:
                 best_auc = auc
                 best_acc = acc
@@ -192,36 +223,38 @@ def run_kfold(args, train_data, test_train_data ,train_uid_df):
                 scheduler.step(best_auc)
             else:
                 scheduler.step()
-
-            gc.collect()
         
         val_auc += best_auc/n_splits
         val_acc += best_acc/n_splits
         oof[valid_idx] = best_preds
-        oof_target[valid_idx] = targets
 
     
-    oof_df = train_uid_df
-    oof_df['preds'] = oof
-    oof_df['target'] = oof_target
-
-    new_output_path=f'{args.output_dir}/{args.task_name}'
-    write_path = os.path.join(new_output_path, "oof_preds.csv")
-    if not os.path.exists(new_output_path):
-        os.makedirs(new_output_path)
-    oof_df.to_csv(write_path, index=False)
-
     print(f'Valid AUC : {val_auc}, Valid ACC : {val_acc} \n')
 
 
 def train(train_loader, model, optimizer, args):
     model.train()
-    print("start training--------------------------")
+
     total_preds = []
     total_targets = []
     losses = []
-    for step, batch in tqdm(enumerate(train_loader)):
-        input = process_batch(batch, args)
+
+    for step, batch in enumerate(train_loader):
+        gc.collect()
+        # print(len(batch))
+        # input = process_batch(batch, args)
+        # input = process_batch_test(batch, args)
+        if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
+            or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint) or isinstance(model,LSTM) or isinstance(model, AutoEncoderLSTMATTN):
+            # print('process_batch_v2 사용')
+            # input = process_batch_v3(batch, args)
+            input = process_batch_v2(batch, args)
+        elif isinstance(model,TestLSTMConvATTN):
+            # print('process_batch_v3 사용')
+            input = process_batch_v3(batch,args)
+        else:
+            input = process_batch(batch,args)
+        # print(f"input 텐서 사이즈 : {type(input)}, {len(input)}")
         preds = model(input)
         targets = input[3] # correct
 
@@ -264,7 +297,17 @@ def validate(valid_loader, model, args):
     total_preds = []
     total_targets = []
     for step, batch in enumerate(valid_loader):
-        input = process_batch(batch, args)
+        # input = process_batch(batch, args)
+        if isinstance(model,MyLSTMConvATTN) or isinstance(model,Saint) or isinstance(model, LastQuery_Post) or isinstance(model,LastQuery_Pre)\
+            or isinstance(model, LastQuery_Post_TEST) or isinstance(model, TfixupSaint) or isinstance(model, AutoEncoderLSTMATTN):
+            input = process_batch_v2(batch, args)
+            # input = process_batch_v3(batch, args)
+        elif isinstance(model,TestLSTMConvATTN):
+            # print('process_batch_v3 사용 for validate')
+            input = process_batch_v3(batch, args)
+        else:
+            input = process_batch(batch,args)
+
 
         preds = model(input)
         targets = input[3] # correct
@@ -307,9 +350,14 @@ def inference(args, test_data):
     
     
     total_preds = []
-    
-    for step, batch in tqdm(enumerate(test_loader)):
-        input = process_batch(batch, args)
+
+    for step, batch in enumerate(test_loader):
+        # input = process_batch(batch, args)
+        # input = process_batch_test(batch,args)
+        if isinstance(model,TestLSTMConvATTN):
+            input = process_batch_v3(batch,args)
+        else:
+            input = process_batch_v2(batch,args)
 
         preds = model(input)
         
@@ -324,18 +372,17 @@ def inference(args, test_data):
             preds = preds.detach().numpy()
             
         total_preds+=list(preds)
-    
-    new_output_path=f'{args.output_dir}/{args.task_name}'
+
+    new_output_path=f'{args.output_dir}{args.task_name}'
     write_path = os.path.join(new_output_path, "output.csv")
     if not os.path.exists(new_output_path):
         os.makedirs(new_output_path)    
+
     with open(write_path, 'w', encoding='utf8') as w:
         print("writing prediction : {}".format(write_path))
         w.write("id,prediction\n")
         for id, p in enumerate(total_preds):
             w.write('{},{}\n'.format(id,p))
-
-
 
 def inference_kfold(args, test_data):
     if args.model=='lgbm':
@@ -349,6 +396,7 @@ def inference_kfold(args, test_data):
         model = load_model_kfold(args, fold)
         model.eval()
         _, test_loader = get_loaders(args, None, test_data)
+        
         
         fold_preds = []
         
@@ -387,7 +435,6 @@ def inference_kfold(args, test_data):
             w.write('{},{}\n'.format(id,p))
 
 
-
 def get_model(args):
     """
     Load model and move tensors to a given devices.
@@ -411,25 +458,169 @@ def get_model(args):
 
     return model
 
+def process_batch_v3(batch,args):
 
-# 배치 전처리
-def process_batch(batch, args):
-    test, question, tag, correct, mask = batch
-    
-    
+    # type -> 1: 범주형
+
+    # batch : load_data_from 에서 return 시킬 feature(컬럼)
+    # test, question,tag,correct, test_level_diff, tag_mean,tag_sum,ans_rate,mask = batch
+    # 규칙 : mask는 항상 맨 뒤임
+    # print(type(batch))
+    # print(batch)
+    test = batch[0]
+    question = batch[1]
+    tag = batch[2]
+    correct = batch[3]
+    mask = batch[len(batch)-1]
     # change to float
     mask = mask.type(torch.FloatTensor)
     correct = correct.type(torch.FloatTensor)
-
-    """
-    interaction에서 rolling의 이유
-    - 이전 time_step에서 푼 문제를 맞췄는지 틀렸는지를 현재 time step의 input으로 넣기 위해서 rolling을 사용한다.
-    """
 
     #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     #    saint의 경우 decoder에 들어가는 input이다
     interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
     interaction = interaction.roll(shifts=1, dims=1)
+    # interaction[:, 0] = 0 # set padding index to the first sequence
+    interaction_mask = mask.roll(shifts=1, dims=1)
+    interaction_mask[:, 0] = 0
+    interaction = (interaction * interaction_mask).to(torch.int64)
+    
+    #  test_id, question_id, tag
+    test = ((test + 1) * mask).to(torch.int64)
+    question = ((question + 1) * mask).to(torch.int64)
+    tag = ((tag + 1) * mask).to(torch.int64)
+
+    new_batch = [None for i in range((len(batch)-5))]
+    # 기타 features
+    # for i in range(4,len(batch)-1):
+    #     new_batch[i-4] = ((batch[i]+1)*mask).to(torch.int64)
+
+    for i in range(4,len(batch)-1):
+        new_batch[i-4] = batch[i]
+
+    # gather index
+    # 마지막 sequence만 사용하기 위한 index
+    gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
+    gather_index = gather_index.view(-1, 1) - 1
+
+    # device memory로 이동
+    m=0
+    test = test.to(args.device)
+    m=max(torch.max(test),m)
+    question = question.to(args.device)
+    m=max(torch.max(question),m)
+
+    tag = tag.to(args.device)
+    m=max(torch.max(tag),m)
+    correct = correct.to(args.device)
+    m=max(torch.max(correct),m)
+    mask = mask.to(args.device)
+    m=max(torch.max(mask),m)
+
+    interaction = interaction.to(args.device)
+    m=max(torch.max(interaction),m)
+    gather_index = gather_index.to(args.device)
+
+    # 기타 feature를 args의 device에 load
+    for i in range(len(new_batch)):
+        new_batch[i] = new_batch[i].to(args.device)
+        m=max(torch.max(new_batch[i]),m)
+
+    ret = [test,question,tag,correct,mask,interaction]
+    ret.extend(new_batch)
+    ret.append(gather_index)
+    # print(f"최댓값 : {m}")
+    return tuple(ret)
+
+# 배치 전처리 일반화
+def process_batch_v2(batch, args):
+    # batch : load_data_from 에서 return 시킬 feature(컬럼)
+    # test, question,tag,correct, test_level_diff, tag_mean,tag_sum,ans_rate,mask = batch
+    # 규칙 : mask는 항상 맨 뒤임
+    # print(type(batch))
+    # print(batch)
+    test = batch[0]
+    question = batch[1]
+    tag = batch[2]
+    correct = batch[3]
+    mask = batch[len(batch)-1]
+    # change to float
+    mask = mask.type(torch.FloatTensor)
+    correct = correct.type(torch.FloatTensor)
+
+    #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
+    #    saint의 경우 decoder에 들어가는 input이다
+    interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
+    interaction = interaction.roll(shifts=1, dims=1)
+    # interaction[:, 0] = 0 # set padding index to the first sequence
+    interaction_mask = mask.roll(shifts=1, dims=1)
+    interaction_mask[:, 0] = 0
+    interaction = (interaction * interaction_mask).to(torch.int64)
+    
+    #  test_id, question_id, tag
+    test = ((test + 1) * mask).to(torch.int64)
+    question = ((question + 1) * mask).to(torch.int64)
+    tag = ((tag + 1) * mask).to(torch.int64)
+
+    new_batch = [None for i in range((len(batch)-5))]
+    # 기타 features
+    for i in range(4,len(batch)-1):
+        new_batch[i-4] = ((batch[i]+1)*mask).to(torch.int64)
+
+    # gather index
+    # 마지막 sequence만 사용하기 위한 index
+    gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
+    gather_index = gather_index.view(-1, 1) - 1
+
+    # device memory로 이동
+    m=0
+    test = test.to(args.device)
+    m=max(torch.max(test),m)
+    question = question.to(args.device)
+    m=max(torch.max(question),m)
+
+    tag = tag.to(args.device)
+    m=max(torch.max(tag),m)
+    correct = correct.to(args.device)
+    m=max(torch.max(correct),m)
+    mask = mask.to(args.device)
+    m=max(torch.max(mask),m)
+
+    interaction = interaction.to(args.device)
+    m=max(torch.max(interaction),m)
+    gather_index = gather_index.to(args.device)
+
+    # 기타 feature를 args의 device에 load
+    for i in range(len(new_batch)):
+        new_batch[i] = new_batch[i].to(args.device)
+        m=max(torch.max(new_batch[i]),m)
+
+    ret = [test,question,tag,correct,mask,interaction]
+    ret.extend(new_batch)
+    ret.append(gather_index)
+    # print(f"최댓값 : {m}")
+    return tuple(ret)
+
+# 배치 전처리 테스트
+def process_batch_test(batch, args):
+    # if len(batch)==6:
+    #     test, question, tag, correct, test_level_diff, mask = batch
+    # else:
+    #     test, question, tag, correct, mask = batch
+    test, question,tag,correct, test_level_diff, tag_mean,tag_sum,ans_rate,mask = batch
+    # test, question, tag, correct, mask = batch # base
+    
+    # print(type(batch))
+    
+    # change to float
+    mask = mask.type(torch.FloatTensor)
+    correct = correct.type(torch.FloatTensor)
+
+    #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
+    #    saint의 경우 decoder에 들어가는 input이다
+    interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
+    interaction = interaction.roll(shifts=1, dims=1)
+    # interaction[:, 0] = 0 # set padding index to the first sequence
     interaction_mask = mask.roll(shifts=1, dims=1)
     interaction_mask[:, 0] = 0
     interaction = (interaction * interaction_mask).to(torch.int64)
@@ -439,6 +630,12 @@ def process_batch(batch, args):
     test = ((test + 1) * mask).to(torch.int64)
     question = ((question + 1) * mask).to(torch.int64)
     tag = ((tag + 1) * mask).to(torch.int64)
+    
+    test_level_diff = ((test_level_diff+1) * mask).to(torch.int64)
+
+    tag_mean = ((tag_mean+1) * mask).to(torch.int64)
+    tag_sum = ((tag_sum+1) * mask).to(torch.int64)
+    ans_rate = ((ans_rate+1) * mask).to(torch.int64)
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
@@ -459,9 +656,78 @@ def process_batch(batch, args):
     interaction = interaction.to(args.device)
     gather_index = gather_index.to(args.device)
 
+    test_level_diff = test_level_diff.to(args.device)
+    tag_mean = tag_mean.to(args.device)
+    tag_sum = tag_sum.to(args.device)
+    ans_rate = ans_rate.to(args.device)
+
     return (test, question,
+    tag, correct, mask, interaction, test_level_diff,tag_mean,tag_sum,ans_rate, gather_index)
+
+# 배치 전처리(기본 feature만 쓸 때, baseline)
+def process_batch(batch, args):
+    if len(batch)==6:
+        test, question, tag, correct, test_level_diff, mask = batch
+    else:
+        test, question, tag, correct, mask = batch
+    # test, question, tag, correct, mask = batch # base
+    # print(type(batch))
+    # change to float
+    mask = mask.type(torch.FloatTensor)
+    correct = correct.type(torch.FloatTensor)
+
+    """
+    interaction에서 rolling의 이유
+    - 이전 time_step에서 푼 문제를 맞췄는지 틀렸는지를 현재 time step의 input으로 넣기 위해서 rolling을 사용한다.
+    """
+    #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
+    #    saint의 경우 decoder에 들어가는 input이다
+    interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
+    interaction = interaction.roll(shifts=1, dims=1)
+    interaction_mask = mask.roll(shifts=1, dims=1)
+    interaction_mask[:, 0] = 0
+    interaction = (interaction * interaction_mask).to(torch.int64)
+    # print(interaction)
+    # exit()
+    #  test_id, question_id, tag
+    test = ((test + 1) * mask).to(torch.int64)
+    question = ((question + 1) * mask).to(torch.int64)
+    tag = ((tag + 1) * mask).to(torch.int64)
+    if len(batch)==6: # train시
+        test_level_diff = ((test_level_diff+1) * mask).to(torch.int64)
+
+
+    # gather index
+    # 마지막 sequence만 사용하기 위한 index
+    gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
+    gather_index = gather_index.view(-1, 1) - 1
+
+
+    # device memory로 이동
+
+    test = test.to(args.device)
+    question = question.to(args.device)
+
+
+    tag = tag.to(args.device)
+    correct = correct.to(args.device)
+    mask = mask.to(args.device)
+
+    interaction = interaction.to(args.device)
+    gather_index = gather_index.to(args.device)
+
+    # dev
+    if len(batch)!=6:
+        
+        return (test, question,
             tag, correct, mask,
             interaction, gather_index)
+    test_level_diff = test_level_diff.to(args.device)
+    # return (test, question,
+    #         tag, correct, mask,
+    #         interaction, gather_index) # base
+    return (test, question,
+    tag, correct, mask, interaction, test_level_diff, gather_index)
 
 
 # loss계산하고 parameter update!
@@ -470,7 +736,6 @@ def compute_loss(preds, targets):
     Args :
         preds   : (batch_size, max_seq_len)
         targets : (batch_size, max_seq_len)
-
     """
     loss = get_criterion(preds, targets)
     #마지막 시퀀드에 대한 값만 loss 계산
@@ -492,22 +757,6 @@ def save_checkpoint(state, model_dir, model_filename):
         os.makedirs(model_dir)    
     torch.save(state, os.path.join(model_dir, model_filename))
 
-
-
-def load_model(args):
-    model_path = os.path.join(args.model_dir, f'{args.task_name}.pt')
-    print("Loading Model from:", model_path)
-    load_state = torch.load(model_path)
-    model = get_model(args)
-
-    # 1. load model state
-    model.load_state_dict(load_state['state_dict'], strict=True)
-    
-    print("Loading Model from:", model_path, "...Finished.")
-    return model
-
-
-
 def load_model_kfold(args, fold):
     model_path = os.path.join((args.model_dir + args.task_name), f'{args.task_name}_{fold+1}fold.pt')
     print("Loading Model from:", model_path)
@@ -520,11 +769,21 @@ def load_model_kfold(args, fold):
     print("Loading Model from:", model_path, "...Finished.")
     return model
 
-
-
 def get_target(datas):
     targets = []
     for data in datas:
         targets.append(data[-1][-1])
 
     return np.array(targets)
+
+def load_model(args):
+    model_path = os.path.join(args.model_dir, f'{args.task_name}.pt')
+    print("Loading Model from:", model_path)
+    load_state = torch.load(model_path)
+    model = get_model(args)
+
+    # 1. load model state
+    model.load_state_dict(load_state['state_dict'], strict=True)
+    
+    print("Loading Model from:", model_path, "...Finished.")
+    return model

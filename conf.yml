@@ -10,22 +10,23 @@ wandb :
         - baseline
 
 ##main params
-task_name: saint_test
+task_name: saint_oof_test
 seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
-file_name: train_data.csv
+file_name: train_month.csv
+test_train_file_name : test_month.csv
 test_file_name: test_data.csv
 
 asset_dir: asset/
 model_dir: models/
 output_dir: output/
 
-max_seq_len: 20
+max_seq_len: 128
 num_workers: 1
 use_stratify : True
-n_fold : 3
+n_fold : 5
 
 ##모델
 hidden_dim : 128

@@ -120,7 +120,8 @@ class Preprocess:
                 )
             )
 
-        return group.values
+        return group.values, pd.DataFrame(df['userID'].unique(), columns=['userID'])
+
 
     def load_train_data(self, file_name):
         self.train_data = self.load_data_from_file(file_name)
