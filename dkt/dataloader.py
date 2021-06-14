@@ -140,7 +140,7 @@ class Preprocess:
             df['Timestamp']=pd.to_datetime(df['Timestamp'].values)
             df['month'] = df['Timestamp'].dt.month
             # df['userID'] = (df['userID'].map(str)+'0'+df['month'].map(str)).astype('int32')
-            df['user_id'] = df['userID'].map(str)+'-'+df['month'].map(str)
+            df['userID'] = df['userID'].map(str)+'-'+df['month'].map(str)
             df.drop(columns=['month'],inplace=True)
             print("user_augmentation 후 유저 수",len(df['userID'].unique()))
         
