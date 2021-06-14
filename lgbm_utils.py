@@ -53,12 +53,19 @@ def get_sharing_feature(args):
     testId_time_agg = df.groupby(['testId'])['solve_time'].agg(['mean','std','skew']).to_dict()
     assessment_time_agg=df.groupby(['assessmentItemID'])['solve_time'].agg(['mean','std','skew']).to_dict()
     KnowledgeTag_time_agg = df.groupby(['KnowledgeTag'])['solve_time'].agg(['mean','std','skew']).to_dict()
-
-    return testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg
+    #해당 문제를 맞은사람의 평균시간과 틀린사람의 평균시간
+    a_t_rate_df=df.groupby(['assessmentItemID','answerCode']).agg({'solve_time':'mean'}).reset_index(drop=False)
+    assess_time_corNwrong_agg=a_t_rate_df.groupby('assessmentItemID')['solve_time'].agg(['first','last']).to_dict()
+    
+    return testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg,assess_time_corNwrong_agg
 
 def make_lgbm_feature(args, df,is_train=True):
-    testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg=get_sharing_feature(args)
+    testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg,assess_time_corNwrong_agg=get_sharing_feature(args)
 
+    #문제별 맞은사람과 틀린사람의 평균풀이시간
+    df['wrongP_time']=df.assessmentItemID.map(assess_time_corNwrong_agg['first'])
+    df['correctP_time']=df.assessmentItemID.map(assess_time_corNwrong_agg['last'])
+    
     item_size = df[['assessmentItemID', 'testId']].drop_duplicates().groupby('testId').size()
     testId2maxlen = item_size.to_dict() # 중복해서 풀이할 놈들을 제거하기 위해
 
@@ -378,7 +385,7 @@ def make_lgb_user_oof_prediction(args, train, test, features, categorical_featur
         # 폴드별 Validation 스코어 측정
         fold_auc, fold_acc ,fold_precision,fold_recall,fold_f1 = get_metric(y_val, list(map(round,val_preds)))
     
-        print(f"Fold {fold + 1} | AUC: {roc_auc_score(y_val, val_preds)} | ACC: {fold_acc} | Precision: {fold_precision} | Recall: {fold_recall} | f1: {fold_f1}")
+        print(f"Fold {fold + 1} | AUC: {fold_auc} | ACC: {fold_acc} | Precision: {fold_precision} | Recall: {fold_recall} | f1: {fold_f1}")
         print('-'*80)
 
         # score 변수에 폴드별 평균 Validation 스코어 저장
