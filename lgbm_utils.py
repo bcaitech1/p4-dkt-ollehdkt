@@ -16,7 +16,6 @@ from sklearn.model_selection import train_test_split, cross_val_score, KFold, St
 from sklearn.impute import SimpleImputer
 import numpy as np
 from collections import defaultdict
-from dkt import metric
 
 def make_sharing_feature(args):
     """[use train+test(except last row) get pre_processed feature]
@@ -245,7 +244,6 @@ def lgbm_train(args,train_data,valid_data):
     lgb_train = lgb.Dataset(train_data[FEATS], y_train)
     lgb_test = lgb.Dataset(valid_data[FEATS], y_test)
     model = lgb.train(
-        
                 args.lgbm.model_params,
                 lgb_train,
                 valid_sets=[lgb_train, lgb_test],
@@ -559,3 +557,13 @@ def make_lgb_oof_prediction(args,train, test, features, categorical_features='au
     plt.close()   
     
     return y_oof, test_preds, fi, score, acc, precision, recall, f1
+
+
+def get_metric(targets, preds):
+    auc = roc_auc_score(targets, preds)
+    acc = accuracy_score(targets, list(map(round,preds)))
+    precision=precision_score(targets, list(map(round,preds)))
+    recall=recall_score(targets, list(map(round,preds)))
+    f1=f1_score(targets, list(map(round,preds)))
+    
+    return auc, acc ,precision,recall,f1
