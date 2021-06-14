@@ -14,7 +14,7 @@ def main(args):
     preprocess = Preprocess(args)
 #     args.infer = True
     preprocess.load_test_data(args.test_file_name)
-    test_data = preprocess.get_test_data()
+    test_data, _ = preprocess.get_test_data()
 
     if args.use_kfold:
       trainer.inference_kfold(args, test_data)

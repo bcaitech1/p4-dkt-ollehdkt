@@ -140,7 +140,7 @@ class Preprocess:
             df['Timestamp']=pd.to_datetime(df['Timestamp'].values)
             df['month'] = df['Timestamp'].dt.month
             # df['userID'] = (df['userID'].map(str)+'0'+df['month'].map(str)).astype('int32')
-            df['userID'] = (df['userID'].map(str)+'0'+df['month'].map(str)).astype('int32')
+            df['user_id'] = df['userID'].map(str)+'-'+df['month'].map(str)
             df.drop(columns=['month'],inplace=True)
             print("user_augmentation 후 유저 수",len(df['userID'].unique()))
         
@@ -175,7 +175,7 @@ class Preprocess:
         print(f"유저수 {len(group)} 피처수 {len(group.iloc[0])} 푼 문제 수 {len(group.iloc[0][0])}")
         len(f'group.values->{len(group.values)}')
         print("load data 후",len(df['userID'].unique()))
-        return group.values
+        return group.values, pd.DataFrame(df['userID'].unique(), columns=['userID'])
 
 
     def load_train_data(self, file_name):

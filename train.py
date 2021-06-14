@@ -23,7 +23,10 @@ def main(args):
     
     preprocess = Preprocess(args)
     preprocess.load_train_data(args.file_name)
-    train_data = preprocess.get_train_data()
+    train_data, train_uid_df = preprocess.get_train_data()
+
+    preprocess.load_train_data(args.test_train_file_name)
+    test_train_data, _ = preprocess.get_train_data()
     
     if args.use_kfold:
         trainer.run_kfold(args, train_data)

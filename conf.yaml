@@ -20,6 +20,7 @@ device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
 file_name: train_time_finalfix.csv
+test_train_file_name : test_month.csv
 test_file_name: test_time_finalfix.csv
 
 asset_dir: asset/
@@ -35,6 +36,7 @@ use_stratify : True
 n_fold : 5
 split_by_user : True #k-fold를 수행할 dataset을 user 기준으로 split
 user_split_augmentation : True
+
 ##모델
 hidden_dim : 256
 n_layers : 2

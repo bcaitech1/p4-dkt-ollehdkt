@@ -112,7 +112,7 @@ def run(args, train_data, valid_data):
     print(f"best AUC : {best_auc:.5f}, accuracy : {best_acc:.5f}, precision : {best_precision:.5f}, recall : {best_recall:.5f}, f1 : {best_f1:.5f}")
 
 
-def run_kfold(args, train_data):
+def run_kfold(args, train_data, test_train_data ,train_uid_df):
     n_splits = args.n_fold
     print("k-fold를 사용합니다","-"*80)
     ### LGBM runner
@@ -193,12 +193,16 @@ def run_kfold(args, train_data):
     val_recall=0
     val_f1=0
     oof = np.zeros(train_data.shape[0])
+    oof_target = np.zeros(train_data.shape[0])
 
     for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data, target)):
         print(f'{fold}fold를 수행합니다')
         trn_data = train_data[train_idx]
         val_data = train_data[valid_idx]
         
+        # test data 중 일부 추가
+        trn_data = np.concatenate([trn_data, test_train_data])
+
         train_loader, valid_loader = get_loaders(args, trn_data, val_data)
 
         # only when using warmup scheduler
@@ -260,7 +264,9 @@ def run_kfold(args, train_data):
                 scheduler.step(best_auc)
             else:
                 scheduler.step()
-        
+
+            gc.collect()
+
         val_auc += best_auc/n_splits
         val_acc += best_acc/n_splits
         val_precision += best_precision/n_splits
@@ -268,7 +274,18 @@ def run_kfold(args, train_data):
         val_f1 += best_f1/n_splits
 
         oof[valid_idx] = best_preds
+        oof_target[valid_idx] = targets
 
+    
+    oof_df = train_uid_df
+    oof_df['preds'] = oof
+    oof_df['target'] = oof_target
+
+    new_output_path=f'{args.output_dir}/{args.task_name}'
+    write_path = os.path.join(new_output_path, "oof_preds.csv")
+    if not os.path.exists(new_output_path):
+        os.makedirs(new_output_path)
+    oof_df.to_csv(write_path, index=False)
 
     print(f"Valid AUC : {val_auc:.5f}, accuracy : {val_acc:.5f}, precision : {val_precision:.5f}, recall : {val_recall:.5f}, f1 : {val_f1:.5f}")
 
@@ -399,7 +416,7 @@ def inference(args, test_data):
             
         total_preds+=list(preds)
 
-    new_output_path=f'{args.output_dir}{args.task_name}'
+    new_output_path=f'{args.output_dir}/{args.task_name}'
     write_path = os.path.join(new_output_path, "output.csv")
     if not os.path.exists(new_output_path):
         os.makedirs(new_output_path)    
@@ -409,6 +426,7 @@ def inference(args, test_data):
         w.write("id,prediction\n")
         for id, p in enumerate(total_preds):
             w.write('{},{}\n'.format(id,p))
+
 
 def inference_kfold(args, test_data):
     if args.model=='lgbm':
@@ -623,24 +641,6 @@ def save_checkpoint(state, model_dir, model_filename):
         os.makedirs(model_dir)    
     torch.save(state, os.path.join(model_dir, model_filename))
 
-def load_model_kfold(args, fold):
-    model_path = os.path.join((args.model_dir + args.task_name), f'{args.task_name}_{fold+1}fold.pt')
-    print("Loading Model from:", model_path)
-    load_state = torch.load(model_path)
-    model = get_model(args)
-
-    # 1. load model state
-    model.load_state_dict(load_state['state_dict'], strict=True)
-    
-    print("Loading Model from:", model_path, "...Finished.")
-    return model
-
-def get_target(datas): #처리하기 전에 get_data_from_file 에서 맨마지막 answer이므로 바뀔일 없음
-    targets = []
-    for data in datas:
-        targets.append(data[-1][-1])
-
-    return np.array(targets)
 
 def load_model(args):
     model_path = os.path.join(args.model_dir, f'{args.task_name}.pt')
@@ -653,3 +653,29 @@ def load_model(args):
     
     print("Loading Model from:", model_path, "...Finished.")
     return model
+
+
+def load_model_kfold(args, fold):
+    model_path = os.path.join((args.model_dir + args.task_name), f'{args.task_name}_{fold+1}fold.pt')
+    print("Loading Model from:", model_path)
+    load_state = torch.load(model_path)
+    model = get_model(args)
+
+    # 1. load model state
+    model.load_state_dict(load_state['state_dict'], strict=True)
+    
+    print("Loading Model from:", model_path, "...Finished.")
+    return model
+
+
+
+
+
+
+
+def get_target(datas): #처리하기 전에 get_data_from_file 에서 맨마지막 answer이므로 바뀔일 없음
+    targets = []
+    for data in datas:
+        targets.append(data[-1][-1])
+
+    return np.array(targets)
