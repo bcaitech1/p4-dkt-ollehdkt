@@ -428,7 +428,7 @@ def inference(args, test_data):
             w.write('{},{}\n'.format(id,p))
 
 
-def inference_kfold(args, test_data):
+def inference_kfold(args, test_data, test_uid_df):
     if args.model=='lgbm':
         return
     
@@ -465,18 +465,16 @@ def inference_kfold(args, test_data):
         else:
             oof_pred += fold_pred / args.n_fold
         
-
+    oof_df = test_uid_df
+    oof_df['preds'] = oof_pred
 
     new_output_path=f'{args.output_dir}/{args.task_name}'
     write_path = os.path.join(new_output_path, "output.csv")
 
     if not os.path.exists(new_output_path):
         os.makedirs(new_output_path)    
-    with open(write_path, 'w', encoding='utf8') as w:
-        print("writing prediction : {}".format(write_path))
-        w.write("id,prediction\n")
-        for id, p in enumerate(oof_pred):
-            w.write('{},{}\n'.format(id,p))
+    
+    oof_df.to_csv(write_path, index=False)
 
 
 def get_model(args):

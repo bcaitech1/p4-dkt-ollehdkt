@@ -29,7 +29,7 @@ def main(args):
     test_train_data, _ = preprocess.get_train_data()
     
     if args.use_kfold:
-        trainer.run_kfold(args, train_data, test_train_data,train_uid_df)
+        trainer.run_kfold(args, train_data, test_train_data, train_uid_df)
     else:
         train_data, valid_data = preprocess.split_data(train_data, ratio=args.split_ratio, seed=args.seed)
         trainer.run(args, train_data, valid_data)
