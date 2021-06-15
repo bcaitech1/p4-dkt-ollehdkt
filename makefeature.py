@@ -20,6 +20,34 @@ from collections import defaultdict
 from lgbm_utils import *
 
 def make_feature(args,df):
+    testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg,assess_time_corNwrong_agg=get_sharing_feature(args)
+
+    #문제별 맞은사람과 틀린사람의 평균풀이시간
+    df['wrongP_time']=df.assessmentItemID.map(assess_time_corNwrong_agg['first'])
+    df['correctP_time']=df.assessmentItemID.map(assess_time_corNwrong_agg['last'])
+    
+    item_size = df[['assessmentItemID', 'testId']].drop_duplicates().groupby('testId').size()
+    testId2maxlen = item_size.to_dict() # 중복해서 풀이할 놈들을 제거하기 위해
+
+    df["test_mean"] = df.testId.map(testId_mean_sum['mean'])
+    df['test_sum'] = df.testId.map(testId_mean_sum['sum'])
+    df["ItemID_mean"] = df.assessmentItemID.map(assessmentItemID_mean_sum['mean'])
+    df['ItemID_sum'] = df.assessmentItemID.map(assessmentItemID_mean_sum['sum'])
+    df["tag_mean"] = df.KnowledgeTag.map(KnowledgeTag_mean_sum['mean'])
+    df['tag_sum'] = df.KnowledgeTag.map(KnowledgeTag_mean_sum['sum'])  
+
+    df['test_t_mean']= df.testId.map(testId_time_agg['mean'])
+    df['test_t_std']= df.testId.map(testId_time_agg['std'])
+    df['test_t_skew']= df.testId.map(testId_time_agg['skew'])
+    df['assess_t_mean']= df.assessmentItemID.map(assessment_time_agg['mean'])
+    df['assess_t_std']= df.assessmentItemID.map(assessment_time_agg['std'])
+    df['assess_t_skew']= df.assessmentItemID.map(assessment_time_agg['skew'])
+    df['tag_t_mean']= df.KnowledgeTag.map(KnowledgeTag_time_agg['mean'])
+    df['tag_t_std']= df.KnowledgeTag.map(KnowledgeTag_time_agg['std'])
+    df['tag_t_skew']= df.KnowledgeTag.map(KnowledgeTag_time_agg['skew'])
+    ###서일님 피처
+
+    df['test_tag_cumsum']=df.groupby(['userID','testId']).agg({'solve_time':'cumsum'})
     
     # 유저가 푼 시험지에 대해, 유저의 전체 정답/풀이횟수/정답률 계산 (3번 풀었으면 3배)
     df_group = df.groupby(['userID','testId'])['answerCode']

@@ -56,7 +56,7 @@ def get_sharing_feature(args):
     #해당 문제를 맞은사람의 평균시간과 틀린사람의 평균시간
     a_t_rate_df=df.groupby(['assessmentItemID','answerCode']).agg({'solve_time':'mean'}).reset_index(drop=False)
     assess_time_corNwrong_agg=a_t_rate_df.groupby('assessmentItemID')['solve_time'].agg(['first','last']).to_dict()
-    
+    print("lgbm feature처럼 사용")
     return testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg,assess_time_corNwrong_agg
 
 def make_lgbm_feature(args, df,is_train=True):
