@@ -4,9 +4,10 @@ import time
 import tqdm
 import pandas as pd
 import random
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, QuantileTransformer
 import numpy as np
 import torch
+
 
 
 class Features:
@@ -349,3 +350,132 @@ class Features:
         df['grade'] = df['testId'].apply(lambda x: x[2]).astype(int)
         return df
 
+    def feature_engineering_15(df):
+        from sklearn.preprocessing import LabelEncoder, QuantileTransformer
+        # 수준
+        df['test_level'] = df['testId'].str[2]
+
+        # 문제 푼 시간
+        df['tmp_index'] = df.index
+        tmp_df = df[['userID', 'testId', 'Timestamp', 'tmp_index']].shift(1)
+        tmp_df['tmp_index'] += 1
+        tmp_df = tmp_df.rename(columns={'Timestamp':'prior_timestamp'})
+        df = df.merge(tmp_df, how='left', on=['userID', 'testId', 'tmp_index'])
+        df['solve_time'] = (df.Timestamp - df.prior_timestamp).dt.seconds
+
+        upper_bound = df['solve_time'].quantile(0.98) # outlier 설정
+        median = df[df['solve_time'] <= upper_bound]['solve_time'].median() 
+        df.loc[df['solve_time'] > upper_bound, 'solve_time'] = median 
+        df['solve_time'] = df['solve_time'].fillna(median) # 빈값을 중앙값으로 채우기
+
+        # 수치형 transform
+        df['solve_time'] = np.log1p(df['solve_time']) #
+        df['solve_time'] = QuantileTransformer(output_distribution='normal').fit_transform(df.solve_time.values.reshape(-1,1)).reshape(-1) 
+
+        # 문제 평균 소모시간
+        assess_time = df.groupby('assessmentItemID').solve_time.mean()
+        assess_time.name = 'mean_elapsed'
+        df = df.merge(assess_time, how='left', on=['assessmentItemID'])
+
+        # 테스트 평균 소모시간
+        test_time = df.groupby('testId').solve_time.mean()
+        test_time.name = 'test_time'
+        df = df.merge(test_time, how='left', on=['testId'])
+
+        # 대분류별 평균 소모시간
+        grade_time = df.groupby('test_level').solve_time.mean()
+        grade_time.name = 'grade_time'
+        df = df.merge(grade_time, how='left', on=['test_level'])
+
+        # user&태그별 누적 정답횟수
+        df['tag_cumAnswer'] = df.groupby(['userID', 'KnowledgeTag']).answerCode.cumsum() - df['answerCode']
+        df['tag_cumAnswer'] = np.log1p(df['tag_cumAnswer'])
+
+
+        # 비율 계산
+        def percentile(s):
+            return np.sum(s) / len(s)
+            
+        # 수준 카테고리를 int로 매핑
+        df['test_level_int'] = df['testId'].str[2].astype(int)
+
+        # 마지막 row, answerCode -1 는 제외한 후 평균을 계산한다.
+        minus_answerCode = df[df['answerCode'] == -1].index
+        cal_df = df.drop(index=minus_answerCode)
+
+        # 수준별 정답률
+        stu_groupby = cal_df.groupby('test_level_int').agg({
+            'assessmentItemID': 'count',
+            'answerCode': percentile
+        }).rename(columns = {'answerCode' : 'answer_rate'})
+
+        # tag별 정답률
+        stu_tag_groupby = cal_df.groupby(['KnowledgeTag']).agg({
+            'answerCode': percentile
+        }).rename(columns = {'answerCode' : 'answer_rate'})
+
+        # 시험지별 정답률
+        stu_test_groupby = cal_df.groupby(['testId']).agg({
+            'answerCode': percentile
+        }).rename(columns = {'answerCode' : 'answer_rate'})
+
+        # 문항별 정답률
+        stu_assessment_groupby = cal_df.groupby(['assessmentItemID']).agg({
+            'answerCode': percentile
+        }).rename(columns = {'assessmentItemID' : 'assessment_count', 'answerCode' : 'answer_rate'})
+
+        # 수준&tag별 정답률
+        level_tag_groupby = df.groupby(['test_level_int', 'KnowledgeTag']).agg({
+            'answerCode': percentile
+        }).rename(columns = {'answerCode' : 'answer_rate'})
+
+        # 수준&시험지별 정답률
+        level_test_groupby = df.groupby(['test_level_int', 'testId']).agg({
+            'answerCode': percentile
+        }).rename(columns = {'answerCode' : 'answer_rate'})
+
+        # 수준&문항별 정답률 + 문제count
+        level_assessment_groupby = df.groupby(['test_level_int', 'assessmentItemID']).agg({
+            'answerCode': percentile
+        }).rename(columns = {'answerCode' : 'answer_rate'})
+
+        # 정답 - 수준별 정답률 
+        df = df.merge(stu_groupby.reset_index()[['test_level_int', 'answer_rate']], on=['test_level_int'])
+        df = df.rename(columns={'answer_rate':'answer_acc'})
+
+        # 정답 - 태그별 정답률
+        df = df.merge(stu_tag_groupby.reset_index()[['answer_rate', 'KnowledgeTag']], on=['KnowledgeTag'])
+        df = df.rename(columns={'answer_rate':'tag_acc'})
+
+        # 정답 - 시험별 정답률
+        df = df.merge(stu_test_groupby.reset_index()[['answer_rate', 'testId']], on=['testId'])
+        df = df.rename(columns={'answer_rate':'test_acc'})
+
+        # 정답 - 문항별 정답률
+        df = df.merge(stu_assessment_groupby.reset_index()[['answer_rate', 'assessmentItemID']], on=['assessmentItemID'])
+        df = df.rename(columns={'answer_rate':'assess_acc'})
+
+        # 정답 - 수준 & 태그별 정답률
+        df = df.merge(level_tag_groupby.reset_index()[['answer_rate', 'KnowledgeTag', 'test_level_int']], on=['test_level_int', 'KnowledgeTag'])
+        df = df.rename(columns={'answer_rate':'level_tag_acc'})
+
+        # 정답 - 수준 & 시험별 정답률
+        df = df.merge(level_test_groupby.reset_index()[['answer_rate', 'testId', 'test_level_int']], on=['test_level_int', 'testId'])
+        df = df.rename(columns={'answer_rate':'level_test_acc'})
+
+        # 정답 - 수준 & 문항별 정답률
+        df = df.merge(level_assessment_groupby.reset_index()[['answer_rate', 'assessmentItemID', 'test_level_int']], on=['test_level_int', 'assessmentItemID'])
+        df = df.rename(columns={'answer_rate':'level_assess_acc'})
+
+        return df
+
+
+    # def month_augmentation(df):
+    #     # import pandas as pd
+    #     df['Timestamp'] = pd.to_datetime(df['Timestamp'].values)
+    #     df['month'] = df['Timestamp'].dt.month
+    #     df['user_id'] = df['userID'].map(str)+'0'+df['month'].map(str)
+    #     df['user_id'] = df['user_id'].astype('int32')
+    #     del df['userID']
+    #     df.rename(columns = {'user_id' : 'userID'}, inplace = True)
+    #     return df

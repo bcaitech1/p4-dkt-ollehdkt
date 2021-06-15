@@ -46,6 +46,7 @@ def get_sharing_feature(args):
     KnowledgeTag_mean_sum = df.groupby(['KnowledgeTag'])['answerCode'].agg(['mean', 'sum']).to_dict()
     
     # 시간 피처
+    
     testId_time_agg = df.groupby(['testId'])['solve_time'].agg(['mean','std','skew']).to_dict()
     assessment_time_agg=df.groupby(['assessmentItemID'])['solve_time'].agg(['mean','std','skew']).to_dict()
     KnowledgeTag_time_agg = df.groupby(['KnowledgeTag'])['solve_time'].agg(['mean','std','skew']).to_dict()
@@ -53,122 +54,124 @@ def get_sharing_feature(args):
     return testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg
 
 def make_lgbm_feature(args, df,is_train=True):
-    testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg=get_sharing_feature(args)
+    # testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg=get_sharing_feature(args)
 
-    item_size = df[['assessmentItemID', 'testId']].drop_duplicates().groupby('testId').size()
-    testId2maxlen = item_size.to_dict() # 중복해서 풀이할 놈들을 제거하기 위해
+    # item_size = df[['assessmentItemID', 'testId']].drop_duplicates().groupby('testId').size()
+    # testId2maxlen = item_size.to_dict() # 중복해서 풀이할 놈들을 제거하기 위해
 
-    df["test_mean"] = df.testId.map(testId_mean_sum['mean'])
-    df['test_sum'] = df.testId.map(testId_mean_sum['sum'])
-    df["ItemID_mean"] = df.assessmentItemID.map(assessmentItemID_mean_sum['mean'])
-    df['ItemID_sum'] = df.assessmentItemID.map(assessmentItemID_mean_sum['sum'])
-    df["tag_mean"] = df.KnowledgeTag.map(KnowledgeTag_mean_sum['mean'])
-    df['tag_sum'] = df.KnowledgeTag.map(KnowledgeTag_mean_sum['sum'])  
+    # df["test_mean"] = df.testId.map(testId_mean_sum['mean'])
+    # df['test_sum'] = df.testId.map(testId_mean_sum['sum'])
+    # df["ItemID_mean"] = df.assessmentItemID.map(assessmentItemID_mean_sum['mean'])
+    # df['ItemID_sum'] = df.assessmentItemID.map(assessmentItemID_mean_sum['sum'])
+    # df["tag_mean"] = df.KnowledgeTag.map(KnowledgeTag_mean_sum['mean'])
+    # df['tag_sum'] = df.KnowledgeTag.map(KnowledgeTag_mean_sum['sum'])  
 
-    df['test_t_mean']= df.testId.map(testId_time_agg['mean'])
-    df['test_t_std']= df.testId.map(testId_time_agg['std'])
-    df['test_t_skew']= df.testId.map(testId_time_agg['skew'])
-    df['assess_t_mean']= df.assessmentItemID.map(assessment_time_agg['mean'])
-    df['assess_t_std']= df.assessmentItemID.map(assessment_time_agg['std'])
-    df['assess_t_skew']= df.assessmentItemID.map(assessment_time_agg['skew'])
-    df['tag_t_mean']= df.KnowledgeTag.map(KnowledgeTag_time_agg['mean'])
-    df['tag_t_std']= df.KnowledgeTag.map(KnowledgeTag_time_agg['std'])
-    df['tag_t_skew']= df.KnowledgeTag.map(KnowledgeTag_time_agg['skew'])
-    ###서일님 피처
-    # 유저가 푼 시험지에 대해, 유저의 전체 정답/풀이횟수/정답률 계산 (3번 풀었으면 3배)
-    df_group = df.groupby(['userID','testId'])['answerCode']
-    df['user_total_correct_cnt'] = df_group.transform(lambda x: x.cumsum().shift(1))
-    df['user_total_ans_cnt'] = df_group.cumcount()
-    df['user_total_acc'] = df['user_total_correct_cnt'] / df['user_total_ans_cnt']
+    # df['test_t_mean']= df.testId.map(testId_time_agg['mean'])
+    # df['test_t_std']= df.testId.map(testId_time_agg['std'])
+    # df['test_t_skew']= df.testId.map(testId_time_agg['skew'])
+    # df['assess_t_mean']= df.assessmentItemID.map(assessment_time_agg['mean'])
+    # df['assess_t_std']= df.assessmentItemID.map(assessment_time_agg['std'])
+    # df['assess_t_skew']= df.assessmentItemID.map(assessment_time_agg['skew'])
+    # df['tag_t_mean']= df.KnowledgeTag.map(KnowledgeTag_time_agg['mean'])
+    # df['tag_t_std']= df.KnowledgeTag.map(KnowledgeTag_time_agg['std'])
+    # df['tag_t_skew']= df.KnowledgeTag.map(KnowledgeTag_time_agg['skew'])
+    # ###서일님 피처
+    # # 유저가 푼 시험지에 대해, 유저의 전체 정답/풀이횟수/정답률 계산 (3번 풀었으면 3배)
+    # df_group = df.groupby(['userID','testId'])['answerCode']
+    # df['user_total_correct_cnt'] = df_group.transform(lambda x: x.cumsum().shift(1))
+    # df['user_total_ans_cnt'] = df_group.cumcount()
+    # df['user_total_acc'] = df['user_total_correct_cnt'] / df['user_total_ans_cnt']
 
-    # 유저가 푼 시험지에 대해, 유저의 풀이 순서 계산 (시험지를 반복해서 풀었어도, 누적되지 않음)
-    # 특정 시험지를 얼마나 반복하여 풀었는지 계산 ( 2번 풀었다면, retest == 1)
-    df['test_size'] = df.testId.map(testId2maxlen)
-    df['retest'] = df['user_total_ans_cnt'] // df['test_size']
-    df['user_test_ans_cnt'] = df['user_total_ans_cnt'] % df['test_size']
+    # # 유저가 푼 시험지에 대해, 유저의 풀이 순서 계산 (시험지를 반복해서 풀었어도, 누적되지 않음)
+    # # 특정 시험지를 얼마나 반복하여 풀었는지 계산 ( 2번 풀었다면, retest == 1)
+    # df['test_size'] = df.testId.map(testId2maxlen)
+    # df['retest'] = df['user_total_ans_cnt'] // df['test_size']
+    # df['user_test_ans_cnt'] = df['user_total_ans_cnt'] % df['test_size']
 
-    # 각 시험지 당 유저의 정확도를 계산
-    df['user_test_correct_cnt'] = df.groupby(['userID','testId','retest'])['answerCode'].transform(lambda x: x.cumsum().shift(1))
-    df['user_acc'] = df['user_test_correct_cnt']/df['user_test_ans_cnt']
+    # # 각 시험지 당 유저의 정확도를 계산
+    # df['user_test_correct_cnt'] = df.groupby(['userID','testId','retest'])['answerCode'].transform(lambda x: x.cumsum().shift(1))
+    # df['user_acc'] = df['user_test_correct_cnt']/df['user_test_ans_cnt']
 
-    ###서일님 피처
+    # ###서일님 피처
 
-    #sequential feature in here
-    #유저들의 문제 풀이수, 정답 수, 정답률을 시간순으로 누적해서 계산
-    # df['user_correct_answer'] = df.groupby('userID')['answerCode'].transform(lambda x: x.cumsum().shift(1))
-    # df['user_total_answer'] = df.groupby('userID')['answerCode'].cumcount()
-    # df['user_acc'] = df['user_correct_answer']/df['user_total_answer']
-    #학생의 학년을 정하고 푼 문제지의 학년합을 구해본다
-    df['test_level']=df['assessmentItemID'].apply(lambda x:int(x[2]))
-    #문제번호
-    df['problem_number']=df['assessmentItemID'].apply(lambda x:int(x[-3:]))
-    #시간
-    # df['year_month']=pd.to_datetime(df['Timestamp'], format="").dt.strftime('%Y-%m')
-    # print(time.dt.strftime('%Y-%m-%d'))
-    df['test_tag_cumsum']=df.groupby(['userID','testId']).agg({'solve_time':'cumsum'})
-    # non-sequential feature in here
-    # testId와 KnowledgeTag의 전체 정답률은 한번에 계산
-    # 아래 데이터는 제출용 데이터셋에 대해서도 재사용
-    group_list=['userID']
+    # #sequential feature in here
+    # #유저들의 문제 풀이수, 정답 수, 정답률을 시간순으로 누적해서 계산
+    # # df['user_correct_answer'] = df.groupby('userID')['answerCode'].transform(lambda x: x.cumsum().shift(1))
+    # # df['user_total_answer'] = df.groupby('userID')['answerCode'].cumcount()
+    # # df['user_acc'] = df['user_correct_answer']/df['user_total_answer']
+    # #학생의 학년을 정하고 푼 문제지의 학년합을 구해본다
+    # df['test_level']=df['assessmentItemID'].apply(lambda x:int(x[2]))
+    # #문제번호
+    # df['problem_number']=df['assessmentItemID'].apply(lambda x:int(x[-3:]))
+    # #시간
+    # # df['year_month']=pd.to_datetime(df['Timestamp'], format="").dt.strftime('%Y-%m')
+    # # print(time.dt.strftime('%Y-%m-%d'))
+    # df['test_tag_cumsum']=df.groupby(['userID','testId']).agg({'solve_time':'cumsum'})
+    # # non-sequential feature in here
+    # # testId와 KnowledgeTag의 전체 정답률은 한번에 계산
+    # # 아래 데이터는 제출용 데이터셋에 대해서도 재사용
+    # group_list=['userID']
     
-    #문제 태그로 groupby했을 때 적용할 함수들
-    # tag_agg_dict={
-    #     # 'answerCode': ['count','mean', 'sum'], #태그개수,태그별 정답률, 해당 태그를 맞춘 개수
-    #     # 'userID' :['nunique'], #해당 태그를 풀이한 유저의 수(인기도), 
-    #     # 'assessmentItemID':['nunique'], #해당 태그가 얼마나 여러 문제번호에 분포돼있는지, 왜도(문제지의 어느부분인지)
-    #     'solve_time' :['mean','std','skew'],
-    # }
+    # #문제 태그로 groupby했을 때 적용할 함수들
+    # # tag_agg_dict={
+    # #     # 'answerCode': ['count','mean', 'sum'], #태그개수,태그별 정답률, 해당 태그를 맞춘 개수
+    # #     # 'userID' :['nunique'], #해당 태그를 풀이한 유저의 수(인기도), 
+    # #     # 'assessmentItemID':['nunique'], #해당 태그가 얼마나 여러 문제번호에 분포돼있는지, 왜도(문제지의 어느부분인지)
+    # #     'solve_time' :['mean','std','skew'],
+    # # }
     
-    #시험지번호로 groupby했을 때 적용할 함수들
-    # test_agg_dict={
-    #     'solve_time' :['mean','std','skew'],
-    #     # 'answerCode': ['count','mean', 'sum'], #시험지별 제출개수 ,시험지별 정답률, 해당 시험지를 풀이하여 맞은 개수
-    #     # 'userID' :['nunique'], #해당 시험지를 풀이한 유저의 수(인기도), 
-    #     # 'assessmentItemID':['nunique'], #해당 시험지에 문제가 얼마나 분포돼있는지, 왜도(문제지의 어느부분인지)
+    # #시험지번호로 groupby했을 때 적용할 함수들
+    # # test_agg_dict={
+    # #     'solve_time' :['mean','std','skew'],
+    # #     # 'answerCode': ['count','mean', 'sum'], #시험지별 제출개수 ,시험지별 정답률, 해당 시험지를 풀이하여 맞은 개수
+    # #     # 'userID' :['nunique'], #해당 시험지를 풀이한 유저의 수(인기도), 
+    # #     # 'assessmentItemID':['nunique'], #해당 시험지에 문제가 얼마나 분포돼있는지, 왜도(문제지의 어느부분인지)
         
+    # # }
+    
+    # #사용자별로 groupby했을 때 적용할 함수들, answercode 관련 column은 위에서 이미 정의함
+    # uid_agg_dict={
+    #     # 'assessmentItemID':['nunique'], #얼마나 많은 종류의 문제를 풀었는지, 왜도(문제지의 어느부분인지)
+    #     # 'problem_number':['skew'],
+    #     # 'year_month':[lambda x:x.value_counts().index[0]],
+    #     # 'Timestamp':['first'],
+    #     # 'test_level':['mean', 'sum','std'],
+    #     'solve_time' :['mean','std','skew'],
     # }
     
-    #사용자별로 groupby했을 때 적용할 함수들, answercode 관련 column은 위에서 이미 정의함
-    uid_agg_dict={
-        # 'assessmentItemID':['nunique'], #얼마나 많은 종류의 문제를 풀었는지, 왜도(문제지의 어느부분인지)
-        # 'problem_number':['skew'],
-        # 'year_month':[lambda x:x.value_counts().index[0]],
-        # 'Timestamp':['first'],
-        # 'test_level':['mean', 'sum','std'],
-        'solve_time' :['mean','std','skew'],
-    }
-    
-    agg_dict_list=[uid_agg_dict]
+    # agg_dict_list=[uid_agg_dict]
     
     
-    for group, now_agg in zip(group_list,agg_dict_list):
-        grouped_df=df.groupby(group).agg(now_agg)
-        new_cols = []
-        for col in now_agg.keys():
-            for stat in now_agg[col]:
-                if type(stat) is str:
-                    new_cols.append(f'{group}-{col}-{stat}')
-                else:
-                    new_cols.append(f'{group}-{col}-mode')
+    # for group, now_agg in zip(group_list,agg_dict_list):
+    #     grouped_df=df.groupby(group).agg(now_agg)
+    #     new_cols = []
+    #     for col in now_agg.keys():
+    #         for stat in now_agg[col]:
+    #             if type(stat) is str:
+    #                 new_cols.append(f'{group}-{col}-{stat}')
+    #             else:
+    #                 new_cols.append(f'{group}-{col}-mode')
 
-        grouped_df.columns = new_cols
+    #     grouped_df.columns = new_cols
 
-        grouped_df.reset_index(inplace = True)
-        df = df.merge(grouped_df, on=group, how='left')
+    #     grouped_df.reset_index(inplace = True)
+    #     df = df.merge(grouped_df, on=group, how='left')
 
     #agg취한 값들이 feature가 된다
-    delete_feats=['userID','assessmentItemID','testId','answerCode','Timestamp','sec_time']
+    # delete_feats=['userID','assessmentItemID','testId','answerCode','Timestamp','sec_time']
+    delete_feats=['userID','assessmentItemID','testId','answerCode','Timestamp','prior_timestamp']
     features = df.drop(columns=delete_feats).columns
-    
+    print(f'df 전 : {df}')
     df.isnull().sum()
     df = df.fillna(0)
-    
+    print(f'df 후 : {df}')
     
     return lgbm_feature_preprocessing(df,features, do_imputing=True)
 
 def lgbm_split_data(data,ratio,seed=42):
     random.seed(seed)
-
+    
+    
     users = list(zip(data['userID'].value_counts().index, data['userID'].value_counts()))
     random.shuffle(users)
 
@@ -298,9 +301,11 @@ def lgbm_feature_preprocessing(train,features, do_imputing=True):
     
     # 범주형 피처 이름을 저장할 변수
     cate_cols = []
-
+    print('lgbm_feature_preprocessing')
+    print(train)
     # 레이블 인코딩
     for f in features:
+        
         if x_tr[f].dtype.name == 'object': # 데이터 타입이 object(str)이면 레이블 인코딩
             cate_cols.append(f)
             le = LabelEncoder()
@@ -309,6 +314,7 @@ def lgbm_feature_preprocessing(train,features, do_imputing=True):
             
             # train 데이터 레이블 인코딩 변환 수행
             x_tr[f] = le.transform(list(x_tr[f].values))
+        
             
 
     print('categorical feature:', cate_cols)

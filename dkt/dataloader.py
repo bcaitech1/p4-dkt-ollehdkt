@@ -19,6 +19,10 @@ import gc
 
 n_cate_cols = 0
 n_cont_cols = 0
+
+use_mask = False
+max_seq_len = 0
+
 class Preprocess:
     def __init__(self,args):
         self.args = args
@@ -85,8 +89,8 @@ class Preprocess:
         def convert_time(s):
             timestamp = time.mktime(datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timetuple())
             return int(timestamp)
-
-        df['Timestamp'] = df['Timestamp'].apply(convert_time)
+        if 'Timestamp' in df.columns:
+            df['Timestamp'] = df['Timestamp'].apply(convert_time)
         
         return df
 
@@ -99,8 +103,8 @@ class Preprocess:
             
         for col in cate_cols:
             print(f'컬럼 : {col}')
-            if col in ['grade']: # grade는 모두 9로 매핑하는 버그가 있어 제외시킨다
-                continue
+            # if col in ['test_level']: # grade는 모두 9로 매핑하는 버그가 있어 제외시킨다
+            #     continue
             le = LabelEncoder()
             if is_train:
                 #For UNKNOWN class
@@ -127,13 +131,17 @@ class Preprocess:
             timestamp = time.mktime(datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timetuple())
             return int(timestamp)
 
-        df['Timestamp'] = df['Timestamp'].apply(convert_time)
+        # df['Timestamp'] = df['Timestamp'].apply(convert_time)
         
         return df
 
     def __feature_engineering(self, df):
         #TODO
         if self.args.model=='lgbm':
+            print('lgbm with FE')
+            df = fe.feature_engineering_15(df)
+            print(df.columns)
+            print(df)
             return make_lgbm_feature(self.args, df)
         else:
             #lgbm 외의 다른 모델들의 fe가 필요하다
@@ -151,7 +159,11 @@ class Preprocess:
             # df = df.merge(fe.feature_engineering_06(pd.DataFrame(df)), left_index=True,right_index=True, how='left')
             # df = fe.feature_engineering_06(df)
             print(f'fe 시 컬럼 확인 : {df.columns}')
+            
             print(df.columns)
+            # if self.args.file_name == 'JH_train (1).csv' or self.args.file_name == 'JH.train.csv':
+            #     df = df.rename(columns={'grade':'difficulty'})
+            #     pass
 
             if self.args.file_name == 'train_inter_time (1).csv' or self.args.file_name == 'test_inter_time (1).csv'\
             or self.args.file_name == 'train_time_finalfix.csv' or self.args.file_name == 'test_time_finalfix.csv':
@@ -161,29 +173,76 @@ class Preprocess:
                 
                 df['solve_time'] = df['solve_time'].apply(lambda x : int(round(x)))
                 
-            df = fe.feature_engineering_14(df)
+            r = pd.DataFrame()
+            # df['Timestamp'] = pd.to_datetime(df['Timestamp'].values)
+            
+            df = fe.feature_engineering_15(df)
+            print(min(df['rank_point']))
+            print(max(df['rank_point']))
             print('dataframe 확인')
             print(df)
 
-            drop_cols = ['_',"index","point","answer_min_count","answer_max_count","user_count","sec_time"] # drop할 칼럼
+            drop_cols = ['_',"index","point","answer_min_count","answer_max_count","user_count","sec_time"
+            "Unnamed: 0","user_correct_answer","user_total_answer","user_correct_answer_tag","user_acc_tag"] # drop할 칼럼
             for col in drop_cols:
                 if col in df.columns:
                     df.drop([col],axis=1, inplace=True)
             print(f"drop 후 : {df.columns}")
 
+            print(f"결측값 확인 : {df.isnull().sum()}")
+
             return df
 
     def load_data_from_file_v4(self, file_name, is_train=True):
-        csv_file_path = os.path.join(self.args.data_dir, file_name)
-        print(f'csv_file_path : {csv_file_path}')
-        df = pd.read_csv(csv_file_path)
+        print(f'self.args.data_dir : {type(self.args.data_dir)}')
+        print(f'file_name : {file_name}')
+        if isinstance(file_name,pd.DataFrame):
+            df = file_name
+        else:
+            csv_file_path = os.path.join(self.args.data_dir, file_name)
+            print(f'csv_file_path : {csv_file_path}')
+            df = pd.read_csv(csv_file_path, parse_dates=['Timestamp'])
 
+        
+        if is_train and self.args.user_split_augmentation:
+            #종호님의 유저 split augmentation
+            df['Timestamp']=pd.to_datetime(df['Timestamp'].values)
+            df['month'] = df['Timestamp'].dt.month
+            df['userID'] = (df['userID'].map(str)+'0'+df['month'].map(str)).astype('int32')
+            df.drop(columns=['month'],inplace=True)
+            df['userID'] = df['userID'].astype('int32')
+
+        # df = pd.read_csv(csv_file_path)
+        
+        print(df.columns)
         col_cnt = len(df.columns)
-        df = self.__feature_engineering(df)
+        if self.args.work != 'server':
+            df = self.__feature_engineering(df)
+
+        '''
+        'Unnamed: 0', 'userID', 'assessmentItemID', 'testId', 'answerCode',
+       'Timestamp', 'KnowledgeTag', 'level', 'test_level_diff_itemID',
+       'test_level_diff_KnowledgeTag', 'test_level_diff_testId',
+       'item_ans_rate', 'rank_point', 'user_correct_answer',
+       'user_total_answer', 'user_acc', 'user_correct_answer_tag',
+       'user_total_answer_tag', 'user_acc_tag', 'solve_time', 'test_t_mean',
+       'test_t_std', 'test_t_skew', 'assess_t_mean', 'assess_t_std',
+       'assess_t_skew', 'tag_t_mean', 'tag_t_std', 'tag_t_skew', 'grade',
+       'test_level'
+        '''
 
         # ※ 주의 : gsaintplus 이용 시 밤주형만 입력할 것
-        self.args.cate_cols = ['assessmentItemID','testId','KnowledgeTag'] # 실험할 범주형
-        self.args.cont_cols = [] # 실험할 연속형 (user_acc)'solve_time', 'user_acc','user_correct_answer', 'user_total_answer',
+#         self.args.cate_cols = ['assessmentItemID','testId','KnowledgeTag',"grade","rank_point","test_level",'test_level_diff_itemID', 'test_level_diff_KnowledgeTag',
+# 'test_level_diff_testId',"difficulty"] # 실험할 범주형
+#         self.args.cont_cols = ['solve_time', 'test_t_mean',
+#        'test_t_std', 'test_t_skew', 'assess_t_mean', 'assess_t_std',
+#        'assess_t_skew', 'tag_t_mean', 'tag_t_std', 'tag_t_skew']
+        self.args.cate_cols = ['assessmentItemID','testId','KnowledgeTag',"test_level"]
+        self.args.cont_cols = ['solve_time', 'mean_elapsed', 'test_time', 'grade_time', # 시간
+            'answer_acc','tag_acc', 'test_acc', 'assess_acc', # 정답률
+            'level_tag_acc', 'level_test_acc', 'level_assess_acc', # 대분류&정답률
+            'tag_cumAnswer',]
+         # 실험할 연속형 (user_acc)'solve_time', 'user_acc','user_correct_answer', 'user_total_answer',
         df = self.__preprocessing_v2(df, is_train)
 
         # 유효 컬럼만 거르기 (Optional)
@@ -197,6 +256,8 @@ class Preprocess:
         for i in self.args.cate_cols:
             if i=='grade':
                 d[i] = 9
+            elif i == 'rank_point':
+                d[i]=10000
             else:
                 d[i] = len(np.load(os.path.join(self.args.asset_dir,f'{i}_classes.npy')))
         print(f'임베딩 사이즈 확인')
@@ -231,13 +292,6 @@ class Preprocess:
             sys.exit()
             return
 
-        # new_df = df['userID']
-        # # new_df = pd.concat([df[i] for i in self.args.cate_cols],axis=1)
-        # for i in ret:
-        #     new_df[i] = df[i]
-        # df = new_df
-        # gc.collect()
-
         print('보낼 최종컬럼 확인')
         print(ret)
         # print(df[columns])
@@ -251,6 +305,31 @@ class Preprocess:
         del df
         gc.collect()
         return group.values # 보낼 컬럼 = (범주형)  + (정답 여부) + (연속형)
+
+    # 서빙용 메소드
+    def load_data_for_serving(self, df, is_train=False):
+        print(f'load_data_for_serving')
+        # df = self.__feature_engineering(df)
+        df = self.__preprocessing(df)
+        
+        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
+
+                
+        self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))
+        self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
+        self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
+        
+        columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag']
+        group = df[columns].groupby('userID').apply(
+                lambda r: (
+                    r['testId'].values, 
+                    r['assessmentItemID'].values,
+                    r['KnowledgeTag'].values,
+                    r['answerCode'].values
+                )
+            )
+
+        return group.values
 
 
     def load_data_from_file(self, file_name, is_train=True):
@@ -308,16 +387,15 @@ class Preprocess:
         return group.values
 
     def load_train_data(self, file_name):
-        # self.train_data = self.load_data_from_file(file_name)
-        # self.train_data = self.load_data_from_file_v2(file_name)
-        # self.train_data = self.load_data_from_file_v3(file_name)
+        
         self.train_data = self.load_data_from_file_v4(file_name)
 
     def load_test_data(self, file_name):
-        # self.test_data = self.load_data_from_file(file_name, is_train= False)
-        # self.test_data = self.load_data_from_file_v2(file_name,is_train=False)
-        # self.test_data = self.load_data_from_file_v3(file_name,is_train=False)
-        self.test_data = self.load_data_from_file_v4(file_name,is_train=False)
+        
+        if isinstance(file_name,pd.DataFrame): # 서빙용
+            self.test_data = self.load_data_for_serving(file_name,is_train=False)
+        else:
+            self.test_data = self.load_data_from_file_v4(file_name,is_train=False)
 
 # 범주형, 연속형
 class TestDKTDataset(torch.utils.data.Dataset):
@@ -331,14 +409,22 @@ class TestDKTDataset(torch.utils.data.Dataset):
         # 각 data의 sequence length
         seq_len = len(row[0])
         # print(f'row 값 : {len(row)}')
-        max_seq_len = self.args.max_seq_len
+        
         global n_cate_cols
         global n_cont_cols
         n_cate_cols = len(self.args.cate_cols)
         n_cont_cols = len(self.args.cont_cols)
         
-        cate_cols = [row[i] for i in range(n_cate_cols+1)] # 범주형
+        cate_cols = [row[i] for i in range(n_cate_cols+1)] # 범주형(answerCode 포함)
         cont_cols = [row[i] for i in range(n_cate_cols+1,len(row))] # 연속형
+
+        # 연속형에 mask 사용여부
+        global use_mask
+        use_mask = self.args.use_mask
+
+        # 최대 seq_len
+        global max_seq_len
+        max_seq_len = self.args.max_seq_len
 
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다.
 
@@ -350,20 +436,28 @@ class TestDKTDataset(torch.utils.data.Dataset):
             mask = np.zeros(self.args.max_seq_len, dtype=np.int16)
             mask[-seq_len:] = 1
 
-        tmp_cont_x_list = [] # 임시로 연속형 변수를 저장할 리스트
+        if use_mask:
+            if seq_len > self.args.max_seq_len:
+                for i, col in enumerate(cont_cols):
+                    cont_cols[i] = col[-self.args.max_seq_len:]
+                    
+        else:
+            tmp_cont_x_list = [] # 임시로 연속형 변수를 저장할 리스트
+            
+            for i in range(n_cate_cols+1,len(row)):
 
-        for i in range(n_cate_cols+1,len(row)):
-
-            tmp_cont_x = torch.FloatTensor(row[i])
-            tmp_cont_x[-1] = 0
-            cont_x = torch.FloatTensor(max_seq_len, 1).zero_()
-            t = tmp_cont_x[-max_seq_len:]
-            # print(f'모양확인 : {t.shape}')
-            l = t.shape[0]
-            tmp_cont_x = t.view(l,1)
-            cont_x[-l:] = tmp_cont_x
-            tmp_cont_x_list.append(cont_x)
-            # print(cont_x.shape)
+                tmp_cont_x = torch.FloatTensor(row[i])
+                
+                tmp_cont_x[-1] = 0
+                
+                cont_x = torch.FloatTensor(max_seq_len, 1).zero_()
+                t = tmp_cont_x[-max_seq_len:]
+                # print(f'모양확인 : {t.shape}')
+                l = t.shape[0]
+                tmp_cont_x = t.view(l,1)
+                cont_x[-l:] = tmp_cont_x
+                tmp_cont_x_list.append(cont_x)
+                # print(cont_x.shape)
 
         ret_cols = list(cate_cols)
         
@@ -378,8 +472,14 @@ class TestDKTDataset(torch.utils.data.Dataset):
         mask = torch.tensor(mask)
         ret_cols.append(mask) # 마스크 추가
         # ret_cols.append(cont_x) # 연속형 변수 추가
-        ret_cols.extend(tmp_cont_x_list)
-
+        if use_mask:
+            # np.array -> torch.Tensor로 형 변환
+            for i,col in enumerate(cont_cols):
+                cont_cols[i] = torch.tensor(col)
+            ret_cols.extend(cont_cols)
+        else:
+            ret_cols.extend(tmp_cont_x_list)
+        
         return ret_cols # 반환 범주형, 마스크, 연속형
 
     def __len__(self):
@@ -467,94 +567,57 @@ from torch.nn.utils.rnn import pad_sequence
 
 # 범주형, 연속형
 def collate_v2(batch):
-    # batch 순서 : (범주형),answerCode,(마스크 1개),(연속형)
-    # col_n = len(batch[0])
-    # for _,i in enumerate(batch):
-    #     print(f'{_}번째 batch')
-    #     for j in i:
-    #         print(type(j),f'길이_연속형 : {j.shape}')
-
-    # print(f'배치 길이 : {len(batch)}')
-    # print(f'col_n : {col_n}')
+    # batch 순서 : (범주형),answerCode,(마스크 1개),(연속형),(use_mask)
+    
     col_n  = n_cate_cols+ 1 + 1 + n_cont_cols # 앞의 1은 answerCode, 뒤의 1은 mask
-
+    # print(use_mask)
     # print(f'col_n : {col_n}')
 
     # print(len(batch))
 
     col_list = [[] for _ in range(col_n)]
+    
     #마스크의 길이로 max_seq_len
-    max_seq_len = len(batch[0][-1])
 
-    # for i in batch:
-    #     print(i)
-    #     print('============================================================')
+    # max_seq_len은 글로벌 변수이다.
+    # max_seq_len = len(batch[0][-1])
+    # print(max_seq_len)
     # batch의 값들을 각 column끼리 그룹화
     for row in batch:
 
-        # 범주형, answerCode, mask
-        for i, col in enumerate(row[:(n_cate_cols+1+1)]):
-            #앞부분에 마스킹을 넣어주어 sequential하게 interaction들을 학습하게 한다
-            
-            pre_padded = torch.zeros(max_seq_len)
-            if len(col.shape)==2: # 버그 해결용 if 문
-                
-                l = len(col)
-                col = col.permute(1,0)
-                # print(col.shape)
-                pre_padded[-l:] = col[0]
-            else:
+        if use_mask: # 마스킹 사용 시
+            for i, col in enumerate(row):
+                pre_padded = torch.zeros(max_seq_len)
+                # print(len(col))
                 pre_padded[-len(col):] = col
-            col_list[i].append(pre_padded)
-
-        # 연속형
-        for i, col in enumerate(row[(n_cate_cols+1+1):]):
-            col_list[(n_cate_cols+1+1)+i].append(row[(n_cate_cols+1+1)+i])
-
+                col_list[i].append(pre_padded)
+        else:
+            # 범주형, answerCode, mask
+            for i, col in enumerate(row[:(n_cate_cols+1+1)]):
+                #앞부분에 마스킹을 넣어주어 sequential하게 interaction들을 학습하게 한다
+                
+                pre_padded = torch.zeros(max_seq_len)
+                pre_padded[-len(col):] = col
+                col_list[i].append(pre_padded)
+            # 연속형
+            for i, col in enumerate(row[(n_cate_cols+1+1):]):
+                col_list[(n_cate_cols+1+1)+i].append(row[(n_cate_cols+1+1)+i])
 
     for i, _ in enumerate(col_list):
         #stack을 통해 피처 텐서를 이어붙인다(차원축으로) <-> torch.cat
-        #각 배치에서 shape(len(feature),len(max_seq_len)) -> shape(len(feature),1,len(max_seq_len)) 
-        col_list[i] =torch.stack(col_list[i])
+        #각 배치에서 shape(len(feature),len(max_seq_len)) -> shape(len(feature),1,len(max_seq_len))
+        if len(col_list[i])>0: 
+            col_list[i] =torch.stack(col_list[i])
     ret_list = []
     ret_list.extend(col_list[:n_cate_cols+1]) # 범주형 및 answerCode 추가
     
     ret_list.extend(col_list[(n_cate_cols+1+1):]) # 연속형 추가
-    ret_list.extend([col_list[n_cate_cols+1]]) # 마스크 추가  
-    
+    ret_list.extend([col_list[n_cate_cols+1]]) # 마스크 추가
+    while [] in ret_list:
+        ret_list.remove([])
+    # print(len(ret_list))
     # print(f'차원 : {col_list[4].shape}')
     return tuple(ret_list)
-
-# 범주형만 붙일 때
-def collate(batch):
-    # batch 순서 : (범주형),(마스크 1개)
-    col_n = len(batch[0])
-    # print(f'col_n : {col_n}')
-    col_list = [[] for _ in range(col_n)]
-    #마스크의 길이로 max_seq_len
-    max_seq_len = len(batch[0][-1])
-
-    # for i in batch:
-    #     print(i)
-    #     print('============================================================')
-    # batch의 값들을 각 column끼리 그룹화
-    # 4+1 = 범주형 4개 + 마스크 1개
-    for row in batch:
-        for i, col in enumerate(row):
-            #앞부분에 마스킹을 넣어주어 sequential하게 interaction들을 학습하게 한다
-            
-            pre_padded = torch.zeros(max_seq_len)
-            pre_padded[-len(col):] = col
-            col_list[i].append(pre_padded)
-
-
-    for i, _ in enumerate(col_list):
-        #stack을 통해 피처 텐서를 이어붙인다(차원축으로) <-> torch.cat
-        #각 배치에서 shape(len(feature),len(max_seq_len)) -> shape(len(feature),1,len(max_seq_len)) 
-        col_list[i] =torch.stack(col_list[i])
-    
-    
-    return tuple(col_list)
 
 
 def get_loaders(args, train, valid):
@@ -746,3 +809,34 @@ def load_data_from_file_v2(self, file_name, is_train=True):
     del df # df는 더이상 쓰이지 않으므로 날림
     len(f'group.values->{len(group.values)}')
     return group.values
+
+# 범주형만 붙일 때
+def collate(batch):
+    # batch 순서 : (범주형),(마스크 1개)
+    col_n = len(batch[0])
+    # print(f'col_n : {col_n}')
+    col_list = [[] for _ in range(col_n)]
+    #마스크의 길이로 max_seq_len
+    max_seq_len = len(batch[0][-1])
+
+    # for i in batch:
+    #     print(i)
+    #     print('============================================================')
+    # batch의 값들을 각 column끼리 그룹화
+    # 4+1 = 범주형 4개 + 마스크 1개
+    for row in batch:
+        for i, col in enumerate(row):
+            #앞부분에 마스킹을 넣어주어 sequential하게 interaction들을 학습하게 한다
+            
+            pre_padded = torch.zeros(max_seq_len)
+            pre_padded[-len(col):] = col
+            col_list[i].append(pre_padded)
+
+
+    for i, _ in enumerate(col_list):
+        #stack을 통해 피처 텐서를 이어붙인다(차원축으로) <-> torch.cat
+        #각 배치에서 shape(len(feature),len(max_seq_len)) -> shape(len(feature),1,len(max_seq_len)) 
+        col_list[i] =torch.stack(col_list[i])
+    
+    
+    return tuple(col_list)

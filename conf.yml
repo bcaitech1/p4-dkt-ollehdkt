@@ -1,8 +1,8 @@
-work : 'train_and_inference' # 'train_and_inference','tuning'
+work : 'train_and_inference' # 'train_and_inference','tuning', 'server', 'test'
 
 # 모델 : 일반화된 모델을 사용하고 싶으면, g를 붙일 것
 # 미 일반화된 모델 : LSTM, Bert
-model : lastquery_pre # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery_pre,lastquery_post, saint, lstmalbertattn,gLSTMConvATTN, gsaint, gsaintplus}
+model : gpt2 # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery_pre,lastquery_post, saint, lstmalbertattn,gLSTMConvATTN, gsaint, gsaintplus}
  
 # (비일반화) : base feature만 사용
 # - lstm,lstmattn,bert
@@ -10,7 +10,7 @@ model : lastquery_pre # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery_pre,
 
 wandb :
     using: False
-    project: DKT-slidding-Window
+    project: DKT-slidding-gpt2
 
     ## 자신의 wandb 아이디를 적어주세요
     entity: sangki930
@@ -18,7 +18,7 @@ wandb :
         - baseline
 
 ##main params
-task_name: slidding_window_max_seq_len_128
+task_name: model-gpt2
 seed: 42
 device: cuda
 
@@ -26,11 +26,13 @@ data_dir: /opt/ml/input/data/train_dataset
 # file_name: train_data.csv
 # file_name : time_train.csv
 # file_name : train_inter_time (1).csv
-file_name : train_time_finalfix.csv
+# file_name : train_time_finalfix.csv
+file_name : JH_train_v3.csv
 # test_file_name: test_data.csv
 # test_file_name : time_test.csv
 # test_file_name : test_inter_time (1).csv
-test_file_name : test_time_finalfix.csv
+# test_file_name : test_time_finalfix.csv
+test_file_name : JH_test_v3.csv
 
 asset_dir: asset/
 model_dir: models/
@@ -47,31 +49,35 @@ split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
 hidden_dim : 256
-n_layers : 2
-n_heads : 2
-drop_out: 0.2
+n_layers : 4
+n_heads : 4
+drop_out: 0.5
+
+# 연속형 컬럼에 마스크를 적용할 것 인지
+use_mask : True
+use_roll : False
 
 # Augmentation
-window : False # 슬라이딩 윈도우를 사용할 것인지
-stride : 10
-shuffle : True
+window : True # 슬라이딩 윈도우를 사용할 것인지
+stride : 16
+shuffle : False
 shuffle_n : 3
 
 # transformers
 concat_reverse : False
 
 #train
-n_epochs: 50
-batch_size: 2048
+n_epochs: 20
+batch_size: 256
 lr: 0.0001
 clip_grad : 10
-patience : 50
+patience : 20
 log_steps : 50
 split_ratio : 0.8
 
 #중요
-optimizer : adamW
-scheduler : plateau 
+optimizer : adamw
+scheduler : plateau
 # plateau #linear_warmup
    
    
@@ -104,3 +110,5 @@ use_test_data : True #use test_data for train
 
 run_train : True
 run_inference : True
+
+user_split_augmentation : True

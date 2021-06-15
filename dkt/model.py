@@ -25,7 +25,8 @@ from transformers.models.albert.modeling_albert import AlbertAttention, AlbertTr
 from transformers.models.albert.configuration_albert import AlbertConfig
 from transformers import BertPreTrainedModel 
 from transformers import GPT2Config, GPT2Model
-from transformers import XLMRobertaModel, XLMRobertaConfig 
+from transformers import XLMRobertaModel, XLMRobertaConfig
+from transformers import MegatronBertConfig,MegatronBertModel
 
 import gc
 
@@ -80,6 +81,11 @@ class CommonModule(nn.Module):
             nn.LayerNorm(self.hidden_dim//2)
         )
 
+        self.embedding_cont_v1 = nn.Sequential(
+            nn.Linear(self.n_cont_cols,self.hidden_dim//2),
+            nn.LayerNorm(self.hidden_dim//2)
+        )
+
         self.fc = nn.Linear((self.hidden_dim//2)*(self.n_cate_cols), 1)
         self.activation = nn.Sigmoid()
 
@@ -103,10 +109,24 @@ class CommonModule(nn.Module):
         # self.chk_type(cate_cols) # type check
 
         embed_interaction = self.embedding_interaction(interaction)
-
+        # print(len(cate_cols))
+        # for i in range(len(cate_cols)):
+        #     print('확인')
+        #     print(cate_cols[i])
+        #     print(cate_cols[i].shape)
+        #     self.embedding_cate[i](cate_cols[i])
+        
+        
         embed_cate = [self.embedding_cate[i](cate_cols[i]) 
         for i in range(len(cate_cols))]
-
+        
+        if (self.args.use_mask or self.args.use_roll) and self.args.model.lower() in ['bert','gpt2','roberta', 'gsaint','generalizedsaint']:
+            if len(cont_cols)>0:
+                # print(cont_cols[0].shape)
+                embed_cont = torch.cat(cont_cols,2)
+            else:
+                embed_cont = None
+            return embed_cate,mask,embed_interaction,embed_cont,gather_index
         # 연속형 - 각자 다른 layer를 거친 후 concat
         # (batch, max_seq_len, 1)
         embed_cont_tmp = [self.embedding_cont(v) for i,v in enumerate(cont_cols)]
@@ -486,34 +506,56 @@ class GeneralizedSaint(nn.Module):
         self.drop_out = self.cm.drop_out
         self.n_layers = self.cm.n_layers
         # encoder combination projection
-        self.enc_comb_proj = nn.Sequential(
-                                    nn.Linear((self.cm.hidden_dim//2)*
-                                    (self.cm.n_cate_cols), (self.cm.hidden_dim//2)*(self.cm.n_cate_cols)),
-                                    # nn.LayerNorm(self.cm.hidden_dim)
-                            )
 
+        self.args = args
+        self.device = args.device
+        self.cm = CommonModule(args)
+        self.concat_reverse = self.cm.concat_reverse
+        # Defining some parameters
+        self.hidden_dim = self.cm.hidden_dim*2
+        self.n_layers = self.args.n_layers
+        self.n_cate_cols = self.cm.n_cate_cols
+        self.n_cont_cols = self.cm.n_cont_cols
+        self.hidden_dim_cate = (self.n_cate_cols+1)*(self.hidden_dim//(2*2))
+        self.hidden_dim_cont = (self.n_cont_cols)*(self.hidden_dim//2)
+        
+        # embedding combination projection
+        # print((self.n_cate_cols)*(self.hidden_dim//2))
+        self.comb_proj_enc = nn.Sequential(
+            nn.Linear((self.n_cate_cols+1)*(self.hidden_dim//(2*2)),self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim)
+        )
+
+        self.cont_proj_enc = nn.Sequential(
+            nn.Linear(self.n_cont_cols,self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim)
+        )
         # DECODER embedding
         # decoder combination projection
-        self.dec_comb_proj = nn.Sequential(
-                                    nn.Linear((self.cm.hidden_dim//2)*
-                                    (self.cm.n_cate_cols+1), (self.cm.hidden_dim//2)*(self.cm.n_cate_cols)),
-                                    # nn.LayerNorm(self.cm.hidden_dim)
-                            )
+        self.comb_proj_dec = nn.Sequential(
+            nn.Linear(self.hidden_dim_cate,self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim)
+        )
+
+        self.cont_proj_dec = nn.Sequential(
+            nn.Linear(self.n_cont_cols,self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim)
+        )
 
         # Positional encoding
-        self.pos_encoder = PositionalEncoding((self.cm.hidden_dim//2)*(self.cm.n_cate_cols), self.drop_out, self.cm.max_seq_len)
-        self.pos_decoder = PositionalEncoding((self.cm.hidden_dim//2)*(self.cm.n_cate_cols), self.drop_out, self.cm.max_seq_len)
+        self.pos_encoder = PositionalEncoding((self.hidden_dim)*1, self.drop_out, self.cm.max_seq_len)
+        self.pos_decoder = PositionalEncoding((self.hidden_dim)*1, self.drop_out, self.cm.max_seq_len)
 
         self.transformer = nn.Transformer(
-            d_model=(self.cm.hidden_dim//2)*(self.cm.n_cate_cols),
+            d_model=self.hidden_dim*1,
             nhead=self.cm.n_heads,
             num_encoder_layers=self.n_layers, 
             num_decoder_layers=self.n_layers, 
-            dim_feedforward=self.cm.hidden_dim, 
+            dim_feedforward=self.hidden_dim*1,
             dropout=self.drop_out, 
             activation='relu')
 
-        self.fc = self.cm.fc # Linear Layer
+        self.fc = nn.Linear(self.hidden_dim*1,1) # Linear Layer
         self.activation = self.cm.activation
 
         self.enc_mask = None
@@ -534,18 +576,37 @@ class GeneralizedSaint(nn.Module):
         #common module 참고
         embed_cate,mask,embed_interaction,embed_cont,gather_index = self.cm.embed(input)
         
-        embed_cate_enc = torch.cat(embed_cate, 2)
-
-        embed_enc = self.enc_comb_proj(embed_cate_enc)
-        
-        # DECODER
         embed_cate_col = embed_cate
 
         cat_list = list(embed_cate_col)
         cat_list.append(embed_interaction)
         
-        embed_dec = torch.cat(cat_list, 2)
-        embed_dec = self.dec_comb_proj(embed_dec)
+        embed_cate_cat = torch.cat(cat_list, 2)
+        # print(f'모양 : {embed_cate_cat.shape}')
+        embed_cate_enc = self.comb_proj_enc(embed_cate_cat)
+
+        # embed_cont_cat = embed_cont
+
+        # embed_cont_enc = self.cont_proj_enc(embed_cont_cat)
+
+        # embed_enc = torch.cat([embed_cate_enc,embed_cont_enc],2)
+        embed_enc = embed_cate_enc
+        
+        # DECODER
+        # embed_cate_col = embed_cate
+
+        # cat_list = list(embed_cate_col)
+        # cat_list.append(embed_interaction)
+        
+        # embed_cate_cat = torch.cat(cat_list, 2)
+        # embed_cate_dec = self.comb_proj_dec(embed_cate_cat)
+        
+        embed_cont_cat = embed_cont
+        embed_cont_dec = self.cont_proj_dec(embed_cont_cat)
+
+        # embed_dec = torch.cat([embed_cate_dec,embed_cont_dec],2)
+        embed_dec = embed_cont_dec
+
         del cat_list
 
         # ATTENTION MASK 생성
@@ -575,8 +636,10 @@ class GeneralizedSaint(nn.Module):
                                tgt_mask=self.dec_mask,
                                memory_mask=self.enc_dec_mask)
 
+        # print(f'out.shape : {out.shape}')
         out = out.permute(1, 0, 2)
-        out = out.contiguous().view(batch_size, -1, (self.cm.hidden_dim//2)*(self.cm.n_cate_cols))
+        # print(f'out.shape : {out.shape}')
+        out = out.contiguous().view(batch_size, -1, self.hidden_dim*1)
         out = self.fc(out)
 
         preds = self.activation(out).view(batch_size, -1)
@@ -760,11 +823,18 @@ class AutoTransformerModel(nn.Module):
         self.hidden_dim = self.cm.hidden_dim
         self.n_layers = self.args.n_layers
         self.n_cate_cols = self.cm.n_cate_cols
+        self.n_cont_cols = self.cm.n_cont_cols
         self.hidden_dim_cate = (self.n_cate_cols+1)*(self.hidden_dim//2)
-        print(self.hidden_dim_cate)
+        self.hidden_dim_cont = (self.n_cont_cols)*(self.hidden_dim//2)
+        
         # embedding combination projection
         self.comb_proj = nn.Sequential(
             nn.Linear(self.hidden_dim_cate,self.hidden_dim*2),
+            nn.LayerNorm(self.hidden_dim*2)
+        )
+
+        self.cont_proj = nn.Sequential(
+            nn.Linear(self.n_cont_cols,self.hidden_dim*2),
             nn.LayerNorm(self.hidden_dim*2)
         )
         self.embedding_cont = self.cm.embedding_cont
@@ -773,31 +843,61 @@ class AutoTransformerModel(nn.Module):
         # Defining the layers
 
         self.model = self.args.model.lower()
-        
+        n_embd = self.hidden_dim*2*2
         if self.model == 'gpt2':
+            
+            # self.hidden_dim*2+self.hidden_dim_cont
             self.config = GPT2Config( 
             3, # not used
-            n_embd=self.hidden_dim*2,
+            n_embd=n_embd,
             n_layer=self.args.n_layers,
             n_head=self.args.n_heads,
-            n_positions=self.args.max_seq_len          
+            n_positions=self.args.max_seq_len,
+            embd_pdrop = self.args.drop_out,
+            attn_pdrop = self.args.drop_out,
+            resid_pdrop  =self.args.drop_out       
         )
             self.encoder = GPT2Model(self.config)
             self.encoder = self.encoder.to(self.device)
-        else:
+        elif self.model == 'bert':
             # Bert config
-            self.config = BertConfig( 
+            self.config = MegatronBertConfig( 
                 3, # not used
-                hidden_size=self.hidden_dim*2,
+                hidden_size=n_embd,
                 num_hidden_layers=self.args.n_layers,
                 num_attention_heads=self.args.n_heads,
                 max_position_embeddings=self.args.max_seq_len          
             )
             # Bert Layer
-            self.encoder = BertModel(self.config)  
+            self.encoder = MegatronBertModel(self.config)
+        elif self.model == 'roberta':
+            # Bert config
+            self.config = RobertaConfig( 
+                3, # not used
+                hidden_size=n_embd,
+                num_hidden_layers=self.args.n_layers,
+                num_attention_heads=self.args.n_heads,
+                intermediate_size=n_embd,
+                hidden_dropout_prob=self.args.drop_out,
+                attention_probs_dropout_prob=self.args.drop_out,
+            )
+            # Bert Layer
+            self.encoder = RobertaModel(self.config)
+        elif self.model == 'convbert':
+            self.config = ConvBertConfig( 
+            3, # not used
+            hidden_size=self.n_embd,
+            num_hidden_layers=self.n_layers,
+            num_attention_heads=self.args.n_heads,
+            intermediate_size=self.hidden_dim,
+            hidden_dropout_prob=self.args.drop_out,
+            attention_probs_dropout_prob=self.args.drop_out,
+            )
+            self.attn = ConvBertModel(self.config)
 
         # Fully connected layer
-        self.fc = nn.Linear(self.hidden_dim*2, 1)
+        # self.fc = nn.Linear(self.hidden_dim*2+self.hidden_dim_cont, 1)
+        self.fc = nn.Linear(n_embd, 1)
         self.drop_out = nn.Dropout(p=args.drop_out)
         self.activation = nn.Sigmoid()
         # self.activation=nn.Tanh()
@@ -813,11 +913,12 @@ class AutoTransformerModel(nn.Module):
         embed_cate = torch.cat(cate_list,2)
         
         embed_cate = self.comb_proj(embed_cate)
-
+        embed_cont = self.cont_proj(embed_cont)
         if embed_cont is not None:
-            embed_cont = self.embedding_cont(embed_cont)
-            print(embed_cont.shape)
+            # embed_cont = self.embedding_cont(embed_cont)
+            # print(embed_cont.shape)
             X = torch.cat([embed_cate,embed_cont],2)
+            # print(X.shape)
         else : 
             X = embed_cate
 
@@ -827,7 +928,84 @@ class AutoTransformerModel(nn.Module):
         # print(X)
         encoded_layers = self.encoder(inputs_embeds=X, attention_mask=mask)
         out = encoded_layers[0]
-        out = out.contiguous().view(batch_size, -1, self.hidden_dim*2)
+        # out = out.contiguous().view(batch_size, -1, self.hidden_dim*2+self.hidden_dim_cont)
+        out = out.contiguous().view(batch_size, -1, self.hidden_dim*2*2)
+        out = self.fc(out)
+        preds = self.activation(out).view(batch_size, -1)
+        # print(torch.min(preds))
+        return preds
+
+# 서빙용 LSTM
+class LSTMTest(nn.Module):
+
+    def __init__(self, args):
+        super(LSTMTest, self).__init__()
+        self.args = args
+        self.device = args.device
+
+        self.hidden_dim = self.args.hidden_dim
+        self.n_layers = self.args.n_layers
+
+        # Embedding 
+        # interaction은 현재 correct로 구성되어있다. correct(1, 2) + padding(0)
+        self.embedding_interaction = nn.Embedding(3, self.hidden_dim//3)
+        self.embedding_test = nn.Embedding(self.args.n_test + 1, self.hidden_dim//3)
+        self.embedding_question = nn.Embedding(self.args.n_questions + 1, self.hidden_dim//3)
+        self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim//3)
+
+        # embedding combination projection
+        self.comb_proj = nn.Linear((self.hidden_dim//3)*4, self.hidden_dim)
+
+        self.lstm = nn.LSTM(self.hidden_dim,
+                            self.hidden_dim,
+                            self.n_layers,
+                            batch_first=True)
+        
+        # Fully connected layer
+        self.fc = nn.Linear(self.hidden_dim, 1)
+
+        self.activation = nn.Sigmoid()
+
+    def init_hidden(self, batch_size):
+        h = torch.zeros(
+            self.n_layers,
+            batch_size,
+            self.hidden_dim)
+        h = h.to(self.device)
+
+        c = torch.zeros(
+            self.n_layers,
+            batch_size,
+            self.hidden_dim)
+        c = c.to(self.device)
+
+        return (h, c)
+
+    def forward(self, input):
+
+        test, question, tag, _, mask, interaction = input
+
+        batch_size = interaction.size(0)
+
+        # Embedding
+
+        embed_interaction = self.embedding_interaction(interaction)
+        embed_test = self.embedding_test(test)
+        embed_question = self.embedding_question(question)
+        embed_tag = self.embedding_tag(tag)
+        
+
+        embed = torch.cat([embed_interaction,
+                           embed_test,
+                           embed_question,
+                           embed_tag,], 2)
+
+        X = self.comb_proj(embed)
+
+        hidden = self.init_hidden(batch_size)
+        out, hidden = self.lstm(X, hidden)
+        out = out.contiguous().view(batch_size, -1, self.hidden_dim)
+
         out = self.fc(out)
         preds = self.activation(out).view(batch_size, -1)
 
