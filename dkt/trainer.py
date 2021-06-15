@@ -200,8 +200,10 @@ def run_kfold(args, train_data, test_train_data ,train_uid_df):
         trn_data = train_data[train_idx]
         val_data = train_data[valid_idx]
         
-        # test data 중 일부 추가
-        trn_data = np.concatenate([trn_data, test_train_data])
+        if args.use_total_data == False:
+            print("validation에 test 파일유저를 넣지 않습니다.")
+            # test data 중 일부 추가
+            trn_data = np.concatenate([trn_data, test_train_data])
 
         train_loader, valid_loader = get_loaders(args, trn_data, val_data)
 
@@ -229,7 +231,7 @@ def run_kfold(args, train_data, test_train_data ,train_uid_df):
             train_auc, train_acc, train_precision,train_recall,train_f1, train_loss = train(train_loader, model, optimizer, args)
         
             ### VALID
-            auc, acc,precision,recall,f1, preds , _ = validate(valid_loader, model, args)
+            auc, acc,precision,recall,f1, preds , targets = validate(valid_loader, model, args)
 
             ### TODO: model save or early stopping
             if args.wandb.using:

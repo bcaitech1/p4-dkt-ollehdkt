@@ -136,11 +136,16 @@ class Preprocess:
             return df
 
         if is_train and self.args.user_split_augmentation:
+            if self.args.use_total_data:
+                csv_file_path = os.path.join(self.args.data_dir, 'test_time_finalfix2.csv')
+                print(f'csv_file_path : {csv_file_path}')
+                tdf = pd.read_csv(csv_file_path)
+                df=pd.concat([df,tdf],ignore_index=True)
             #종호님의 유저 split augmentation
             df['Timestamp']=pd.to_datetime(df['Timestamp'].values)
             df['month'] = df['Timestamp'].dt.month
-            # df['userID'] = (df['userID'].map(str)+'0'+df['month'].map(str)).astype('int32')
-            df['userID'] = df['userID'].map(str)+'-'+df['month'].map(str)
+            df['userID'] = (df['userID'].map(str)+df['month'].apply(lambda x: ('0'+str(x)) if x<10 else str(x))).astype('int32')
+            # df['userID'] = df['userID'].map(str)+'-'+df['month'].map(str)
             df.drop(columns=['month'],inplace=True)
             print("user_augmentation 후 유저 수",len(df['userID'].unique()))
         
@@ -153,7 +158,7 @@ class Preprocess:
         df = self.__feature_engineering(df)
         df = self.__preprocessing(df, is_train)
 
-        # df['userID']=df['userID'].astype(int)
+        df['userID']=df['userID'].astype(int)
         df['KnowledgeTag']=df['KnowledgeTag'].astype(int)
         
 
