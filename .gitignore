@@ -17,3 +17,10 @@ dkt/.ipynb_checkpoints
 __pycache__
 /asset
 *.ipynb
+
+serving_args.py
+dkt/__pycache__
+dkt/toy_project_solution
+src
+static
+templates
