@@ -175,10 +175,9 @@ class Preprocess:
                 
             r = pd.DataFrame()
             # df['Timestamp'] = pd.to_datetime(df['Timestamp'].values)
-            
+            df = fe.feature_engineering_16(df)
             df = fe.feature_engineering_15(df)
-            print(min(df['rank_point']))
-            print(max(df['rank_point']))
+            
             print('dataframe 확인')
             print(df)
 
@@ -237,7 +236,7 @@ class Preprocess:
 #         self.args.cont_cols = ['solve_time', 'test_t_mean',
 #        'test_t_std', 'test_t_skew', 'assess_t_mean', 'assess_t_std',
 #        'assess_t_skew', 'tag_t_mean', 'tag_t_std', 'tag_t_skew']
-        self.args.cate_cols = ['assessmentItemID','testId','KnowledgeTag',"test_level"]
+        self.args.cate_cols = ['assessmentItemID','testId','KnowledgeTag','test_level_diff_testId',"test_level"]
         self.args.cont_cols = ['solve_time', 'mean_elapsed', 'test_time', 'grade_time', # 시간
             'answer_acc','tag_acc', 'test_acc', 'assess_acc', # 정답률
             'level_tag_acc', 'level_test_acc', 'level_assess_acc', # 대분류&정답률

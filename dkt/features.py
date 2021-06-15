@@ -469,6 +469,94 @@ class Features:
 
         return df
 
+    # test_diff
+    def feature_engineering_16(df):
+        def percentile(s):
+            return np.sum(s) / len(s)
+        def fun(x):
+            if x > 0.8 :
+                return 5
+            elif x <=0.8 and x >0.6 :
+                return 4
+            elif x <=0.6 and x >0.4 :
+                return 3
+            elif x <=0.4 and x >0.2 :
+                return 2
+            elif x <=0.2  :
+                return 1
+        df1=df.groupby('userID').agg({'answerCode': percentile})
+        df1.columns = ["test_rate"]
+        df1.reset_index(inplace = True)
+        df2 = df1.copy()
+        df2['level']=pd.Series([fun(x) for x in df2['test_rate']])
+        del df2['test_rate']
+        df = pd.merge(df,df2,on='userID')
+        df3 =df.groupby(['assessmentItemID','level']).agg({'answerCode':['sum','count']})
+        df3.reset_index(inplace=True)
+        df3.columns = ['assessmentItemID','point','sum','count']
+        df4 = df3.copy()
+        df4 = df4.sort_values(by="point", ascending=True).groupby("assessmentItemID").head(1)
+        df4.drop(["point", "count"], axis=1,inplace = True)
+    #     del df4['point']
+    #     del df4['count']
+        df4.columns = ['assessmentItemID','answer_min_count']
+        df5 = df3.copy()
+        df5 = df5.sort_values(by="point", ascending=False).groupby("assessmentItemID").head(1)
+        df5.drop(["point", "count"], axis=1,inplace = True)
+    #     del df5['point']
+    #     del df5['count']
+        df5.columns = ['assessmentItemID','answer_max_count']
+        df = pd.merge(df,df4,on='assessmentItemID')
+        df = pd.merge(df,df5,on='assessmentItemID')
+        df6 = df.groupby('assessmentItemID').agg({'userID':'count'})
+        df6.columns = ['user_count']
+        df = pd.merge(df,df6,on='assessmentItemID')
+        df['test_level_diff_itemID']=pd.Series((df['answer_max_count']-df['answer_min_count'])/(df['user_count']/2))
+        df.drop(["answer_max_count", "answer_min_count",'user_count'], axis=1,inplace = True)
+    ###################################################################################################################################
+        df7 =df.groupby(['KnowledgeTag','level']).agg({'answerCode':['sum','count']})
+        df7.reset_index(inplace=True)
+        df7.columns = ['KnowledgeTag','point','sum','count']
+        df8 = df7.copy()
+        df8= df8.sort_values(by="point", ascending=True).groupby("KnowledgeTag").head(1)
+        del df8['point']
+        del df8['count']
+        df8.columns = ['KnowledgeTag','answer_min_count']
+        df9 = df7.copy()
+        df9 = df9.sort_values(by="point", ascending=False).groupby("KnowledgeTag").head(1)
+        del df9['point']
+        del df9['count']
+        df9.columns = ['KnowledgeTag','answer_max_count']
+        df = pd.merge(df,df8,on='KnowledgeTag')
+        df = pd.merge(df,df9,on='KnowledgeTag')
+        df10 = df.groupby('KnowledgeTag').agg({'userID':'count'})
+        df10.columns = ['user_count']
+        df = pd.merge(df,df10,on='KnowledgeTag')
+        df['test_level_diff_KnowledgeTag']=pd.Series((df['answer_max_count']-df['answer_min_count'])/(df['user_count']/2))
+        df.drop(["answer_max_count", "answer_min_count",'user_count'], axis=1,inplace = True)
+    ###################################################################################################################################
+        df11 =df.groupby(['testId','level']).agg({'answerCode':['sum','count']})
+        df11.reset_index(inplace=True)
+        df11.columns = ['testId','point','sum','count']
+        df12 = df11.copy()
+        df12= df12.sort_values(by="point", ascending=True).groupby("testId").head(1)
+        del df12['point']
+        del df12['count']
+        df12.columns = ['testId','answer_min_count']
+        df13 = df11.copy()
+        df13 = df13.sort_values(by="point", ascending=False).groupby("testId").head(1)
+        del df13['point']
+        del df13['count']
+        df13.columns = ['testId','answer_max_count']
+        df = pd.merge(df,df12,on='testId')
+        df = pd.merge(df,df13,on='testId')
+        df14 = df.groupby('testId').agg({'userID':'count'})
+        df14.columns = ['user_count']
+        df = pd.merge(df,df14,on='testId')
+        df['test_level_diff_testId']=pd.Series((df['answer_max_count']-df['answer_min_count'])/(df['user_count']/2))
+        df.drop(["answer_max_count", "answer_min_count",'user_count'], axis=1,inplace = True)
+        return df
+
 
     # def month_augmentation(df):
     #     # import pandas as pd

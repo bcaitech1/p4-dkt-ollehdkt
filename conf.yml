@@ -2,7 +2,7 @@ work : 'train_and_inference' # 'train_and_inference','tuning', 'server', 'test'
 
 # 모델 : 일반화된 모델을 사용하고 싶으면, g를 붙일 것
 # 미 일반화된 모델 : LSTM, Bert
-model : gpt2 # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery_pre,lastquery_post, saint, lstmalbertattn,gLSTMConvATTN, gsaint, gsaintplus}
+model : gsaint # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery_pre,lastquery_post, saint, lstmalbertattn,gLSTMConvATTN, gsaint, gsaintplus}
  
 # (비일반화) : base feature만 사용
 # - lstm,lstmattn,bert
@@ -18,21 +18,21 @@ wandb :
         - baseline
 
 ##main params
-task_name: model-gpt2-01
+task_name: model-saint-01
 seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
-# file_name: train_data.csv
+file_name: train_data.csv
 # file_name : time_train.csv
 # file_name : train_inter_time (1).csv
 # file_name : train_time_finalfix.csv
-file_name : JH_train_v3.csv
-# test_file_name: test_data.csv
+# file_name : JH_train_v3.csv
+test_file_name: test_data.csv
 # test_file_name : time_test.csv
 # test_file_name : test_inter_time (1).csv
 # test_file_name : test_time_finalfix.csv
-test_file_name : JH_test_v3.csv
+# test_file_name : JH_test_v3.csv
 
 asset_dir: asset/
 model_dir: models/
