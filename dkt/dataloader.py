@@ -37,24 +37,14 @@ class Preprocess:
         return self.test_data
 
 
-    def split_data(self, data, ratio=0.7, shuffle=True, seed=42):
+    def split_data(self, data):
         """
         split data into two parts with a given ratio.
         """
-        #lgbm일 경우
-        if self.args.model=='lgbm':
-            return lgbm_split_data(data,ratio,seed)
 
-        #lgbm이 아닐 경우
-        if shuffle:
-            random.seed(seed) # fix to default seed 0
-            random.shuffle(data)
+        
 
-        size = int(len(data) * ratio)
-        data_1 = data[:size]
-        data_2 = data[size:]
-
-        return data_1, data_2
+        return train, valid
 
     def __save_labels(self, encoder, name):
         le_path = os.path.join(self.args.asset_dir, name + '_classes.npy') # 해당 클래스는 numpy로 저장
@@ -177,8 +167,8 @@ class Preprocess:
             # df['Timestamp'] = pd.to_datetime(df['Timestamp'].values)
             
             df = fe.feature_engineering_15(df)
-            print(min(df['rank_point']))
-            print(max(df['rank_point']))
+            # print(min(df['rank_point']))
+            # print(max(df['rank_point']))
             print('dataframe 확인')
             print(df)
 
@@ -208,9 +198,8 @@ class Preprocess:
             #종호님의 유저 split augmentation
             df['Timestamp']=pd.to_datetime(df['Timestamp'].values)
             df['month'] = df['Timestamp'].dt.month
-            df['userID'] = (df['userID'].map(str)+'0'+df['month'].map(str)).astype('int32')
+            df['userID'] = df['userID'].map(str)+'-'+df['month'].map(str)
             df.drop(columns=['month'],inplace=True)
-            df['userID'] = df['userID'].astype('int32')
 
         # df = pd.read_csv(csv_file_path)
         
@@ -302,9 +291,9 @@ class Preprocess:
         print(f'group.values->{len(group.values)}')
         print(group)
 
-        del df
+        # del df
         gc.collect()
-        return group.values # 보낼 컬럼 = (범주형)  + (정답 여부) + (연속형)
+        return group.values, pd.DataFrame(df['userID'].unique(), columns=['userID']) # 보낼 컬럼 = (범주형)  + (정답 여부) + (연속형)
 
     # 서빙용 메소드
     def load_data_for_serving(self, df, is_train=False):

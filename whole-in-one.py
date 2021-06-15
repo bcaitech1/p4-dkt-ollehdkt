@@ -13,7 +13,7 @@ import wandb
 
 from train import main as t_main
 from inference import main as i_main
-from server import main as s_main
+# from server import main as s_main
 from test import main as test_main
 
 import numpy as np
@@ -52,6 +52,7 @@ if __name__ == "__main__":
         print(d)
         args.cate_dict = d
         s_main(args)
+
     elif args.work == 'test':
         args.cate_cols = ['assessmentItemID','testId','KnowledgeTag',"test_level"]
         args.cont_cols = ['solve_time', 'mean_elapsed', 'test_time', 'grade_time', # 시간

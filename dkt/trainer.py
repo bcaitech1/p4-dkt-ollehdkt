@@ -11,6 +11,7 @@ from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .criterion import get_criterion
 from .metric import get_metric
+from .dataloader import Preprocess, data_augmentation
 import wandb
 
 from .model import *
@@ -100,59 +101,9 @@ def run(args, train_data, valid_data):
         else:
             scheduler.step()
 
-def run_kfold(args, train_data):
+def run_kfold(args, train_data, train_uid_df):
     n_splits = args.n_fold
     print("k-fold를 사용합니다","-"*80)
-    ### LGBM runner
-    if args.model=='lgbm':
-        
-        csv_file_path = os.path.join(args.data_dir, args.file_name)
-        train_df = pd.read_csv(csv_file_path)#, nrows=100000)
-        
-        csv_file_path = os.path.join(args.data_dir, args.test_file_name)
-        test_df = pd.read_csv(csv_file_path)#, nrows=100000)
-        
-        if args.use_test_data:#test의 데이터까지 사용할 경우
-            train_df=make_sharing_feature(args)
-            
-        train_df=make_lgbm_feature(args,train_df)
-        test_df=make_lgbm_feature(args,test_df)
-        
-        delete_feats=['userID','assessmentItemID','testId','answerCode','Timestamp','sec_time']
-        features=list(set(test_df.columns)-set(delete_feats))
-
-        print(f'사용한 피처는 다음과 같습니다')
-        print(features)
-
-        if args.split_by_user: #유저별로 train/valid set을 나눌 때
-            y_oof,pred,fi,score,acc=make_lgb_user_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
-            if args.wandb.using:
-                wandb.log({"valid_auc":score, "valid_acc":acc})
-        else : #skl split라이브러리를 이용하여 유저 구분없이 나눌 때 
-            y_oof,pred,fi=make_lgb_oof_prediction(args,train_df, test_df, features, categorical_features='auto', model_params=args.lgbm.model_params, folds=args.n_fold)
-        
-        
-        new_output_path=f'{args.output_dir}{args.task_name}'
-        write_path = os.path.join(new_output_path, "output.csv")
-        if not os.path.exists(new_output_path):
-            os.makedirs(new_output_path)    
-        with open(write_path, 'w', encoding='utf8') as w:
-            print("writing prediction : {}".format(write_path))
-            w.write("id,prediction\n")
-            for id, p in enumerate(pred):
-                w.write('{},{}\n'.format(id,p))
-
-        print(f"lgbm의 예측파일이 {new_output_path}/{args.task_name}.csv 로 저장됐습니다.")
-
-        save_path=f"{args.output_dir}{args.task_name}/feature{len(features)}_config.json"
-        json.dump(
-            features,
-            open(save_path, "w"),
-            indent=2,
-            ensure_ascii=False,
-        )
-        return
-
 
     if args.use_stratify == True:
         kfold = StratifiedKFold(n_splits=n_splits, shuffle=True)
@@ -165,10 +116,13 @@ def run_kfold(args, train_data):
     val_acc = 0
 
     oof = np.zeros(train_data.shape[0])
+    oof_target = np.zeros(train_data.shape[0])
 
-    for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data, target)):
+    for fold, (train_idx, valid_idx) in enumerate(kfold.split(train_data)):
         trn_data = train_data[train_idx]
         val_data = train_data[valid_idx]
+
+        trn_data = data_augmentation(train_data,args)
         
         train_loader, valid_loader = get_loaders(args, trn_data, val_data)
 
@@ -193,7 +147,7 @@ def run_kfold(args, train_data):
             train_auc, train_acc, train_loss = train(train_loader, model, optimizer, args)
             
             ### VALID
-            auc, acc, preds , _ = validate(valid_loader, model, args)
+            auc, acc, preds, targets = validate(valid_loader, model, args)
 
             ### TODO: model save or early stopping
             if args.wandb.using:
@@ -228,8 +182,18 @@ def run_kfold(args, train_data):
         val_auc += best_auc/n_splits
         val_acc += best_acc/n_splits
         oof[valid_idx] = best_preds
+        oof_target[valid_idx] = targets
 
-    
+    oof_df = train_uid_df
+    oof_df['preds'] = oof
+    oof_df['target'] = oof_target
+
+    new_output_path=f'{args.output_dir}/{args.task_name}'
+    write_path = os.path.join(new_output_path, "oof_preds.csv")
+    if not os.path.exists(new_output_path):
+        os.makedirs(new_output_path)
+    oof_df.to_csv(write_path, index=False)
+
     print(f'Valid AUC : {val_auc}, Valid ACC : {val_acc} \n')
 
 
