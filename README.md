@@ -185,9 +185,13 @@ Team Rank : 7 , AUROC : 0.8362, Accuracy : 0.7527
 
 　✳ 40개의 features를 input으로 하여 주성분 분석을 수행	
 
-　✳ 주성분 분석 결과 - 20개의 주성분
+　✳ 주성분 분석 결과 
 
 ![image10](https://github.com/bcaitech1/p4-dkt-ollehdkt/blob/chaewon/image/PCA.png?raw=true)
+  94%이상의 분산설명력을 가지기 위해서는 20개 이상의 주성분이 필요했다.
+
+  20개의 주성분을 가지고 모델 train과 inference한 결과, Validation AUC가 0.8136 나왔다.
+
 
 ➡ ensemble
 
