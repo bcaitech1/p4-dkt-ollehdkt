@@ -43,11 +43,7 @@ Team Rank : 7 , AUROC : 0.8362, Accuracy : 0.7527
 
 ---
 
----
-
-### Olleh Team <a name = 'team'></a>
-
-<br>
+### 🌏Olleh Team <a name = 'team'></a>
 
 #### 김종호 [Project Branch](https://github.com/bcaitech1/p4-dkt-ollehdkt/tree/headbreakz) ![Github Badge](https://img.shields.io/badge/-Github-161c22?style=flat&logo=github&link=https://github.com/Headbreakz)![Blog Badge](http://img.shields.io/badge/Blog-51a9fe?style=flat&link=https://philgineer.com/) 
 
@@ -109,23 +105,23 @@ Team Rank : 7 , AUROC : 0.8362, Accuracy : 0.7527
 
  ➡ 데이터 분석 기반 Feature
 
- 	✳User ID, assessmentItemID, testId, KnowledgeTag, Timestamp 과 answerCode 관계
+　✳ User ID, assessmentItemID, testId, KnowledgeTag, Timestamp 과 answerCode 관계
 
- 	✳각 Value와 answerCode값의 평균, 분산, Skew, 누적합, 누적 평균
+　✳각 Value와 answerCode값의 평균, 분산, Skew, 누적합, 누적 평균
 
- 	✳각 Value 값의 통계적 수치
+　✳각 Value 값의 통계적 수치
 
  ➡ 교육학 이론 기반 Feature
 
-​	✳assessmentItemID, testId, KnowledgeTag의 변별도 값 
+　✳assessmentItemID, testId, KnowledgeTag의 변별도 값 
 
-​	✳변별도 : (상위 정답 수 - 하위 정답 수 ) / (총 응시자 / 2)
+　✳변별도 : (상위 정답 수 - 하위 정답 수 ) / (총 응시자 / 2)
 
 ➡ ELO rating
 
-​	✳정답 여부에 따른 개인 Rank 점수 적용
+　✳정답 여부에 따른 개인 Rank 점수 적용
 
-​	✳문제 난이도에 따른 Rank 점수의 증가와 감소
+　✳문제 난이도에 따른 Rank 점수의 증가와 감소
 
 ➡ 총 47개의 Feature 생성
 
@@ -161,17 +157,17 @@ Team Rank : 7 , AUROC : 0.8362, Accuracy : 0.7527
 
 ➡ UserID split
 
-​	✳userID를 기준으로 k-fold를 진행
+　✳userID를 기준으로 k-fold를 진행
 
 ​	
 
 ➡ grade별 검증
 
-​	✳ 사용자의 대표 grade를 추출하여, grade의 비율에 맞게 K-fold 수행
+　✳ 사용자의 대표 grade를 추출하여, grade의 비율에 맞게 K-fold 수행
 
-​	✳ ex) A**030**071005, testID, AssesmentID 에서 앞자리 3자리의 경우 Grade
+　✳ ex) A**030**071005, testID, AssesmentID 에서 앞자리 3자리의 경우 Grade
 
-​	✳ 문제점
+　✳ 문제점
 
   User 별로 grade가 고정되어 있지 않은 경우를 확인하였다.( ex, userID 315가 grade 3, 4, 7의 문제를 모두 푸는 경우) 따라서 사용자의 grade를 하나로 특정하기 어려운 문제 발생하였다. 이를 해결 하기 위해 하나의 사용자에서 가장 많이 등장한 grade를 기준으로 사용자의 대표 grade 설정하였다.
 
@@ -187,15 +183,15 @@ Team Rank : 7 , AUROC : 0.8362, Accuracy : 0.7527
 
 ➡ PCA
 
-​	✳ 40개의 features를 input으로 하여 주성분 분석을 수행	
+　✳ 40개의 features를 input으로 하여 주성분 분석을 수행	
 
-​	✳ 주성분 분석 결과 - 20개의 주성분
+　✳ 주성분 분석 결과 - 20개의 주성분
 
 ![image10](https://github.com/bcaitech1/p4-dkt-ollehdkt/blob/headbreakz/image/PCA.png?raw=true)
 
 ➡ ensemble
 
-​	✳ soft voting
+　✳ soft voting
 
   분류기들의 레이블 값 결정 확률을 모두 더하고 **이를 평균**해서 이들 중 확률이 가장 높은 레이블 값을 최종 보팅 결괏값 으로 선정.
 
@@ -229,7 +225,7 @@ Team Rank : 7 , AUROC : 0.8362, Accuracy : 0.7527
 
 ✳ Priority Max Ensemble
 
-​	✳ 상위 4개 prediction 중 정확도가 가장 높은 정확도를 가진 prediction을 우선으로 4개의 prediction의 max값을 취해서 Ensemble을 하였다. 이러한 방법을 선택한 이유는 정확도 값은 보존하면서 auc가 높아질 것으로 예상하여 사용하였다.
+상위 4개 prediction 중 정확도가 가장 높은 정확도를 가진 prediction을 우선으로 4개의 prediction의 max값을 취해서 Ensemble을 하였다. 이러한 방법을 선택한 이유는 정확도 값은 보존하면서 auc가 높아질 것으로 예상하여 사용하였다.
 
 ```python
 pd_list[0]['prediction']
@@ -277,3 +273,6 @@ for i in range(len(pd_list[0])):
 [Saint+](https://arxiv.org/pdf/2010.12042.pdf)
 
 [EGNET+KT1](https://arxiv.org/pdf/1912.03072.pdf)
+
+---
+
