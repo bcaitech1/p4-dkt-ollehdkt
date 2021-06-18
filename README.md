@@ -167,7 +167,7 @@ Team Rank : 7 , AUROC : 0.8362, Accuracy : 0.7527
 
 　✳ ex) A**030**071005, testID, AssesmentID 에서 앞자리 3자리의 경우 Grade
 
-　✳ 문제점
+　✳ 상세 
 
   User 별로 grade가 고정되어 있지 않은 경우를 확인하였다.( ex, userID 315가 grade 3, 4, 7의 문제를 모두 푸는 경우) 따라서 사용자의 grade를 하나로 특정하기 어려운 문제 발생하였다. 이를 해결 하기 위해 하나의 사용자에서 가장 많이 등장한 grade를 기준으로 사용자의 대표 grade 설정하였다.
 
