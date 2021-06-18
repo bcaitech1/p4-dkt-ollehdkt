@@ -1,12 +1,8 @@
-work : 'train_and_inference' # 'train_and_inference','tuning', 'server', 'test'
+work : 'server' # 'train_and_inference','tuning', 'server', 'test'
 
 # 모델 : 일반화된 모델을 사용하고 싶으면, g를 붙일 것
 # 미 일반화된 모델 : LSTM, Bert
-model : gpt2 # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery_pre,lastquery_post, saint, lstmalbertattn,gLSTMConvATTN, gsaint, gsaintplus}
- 
-# (비일반화) : base feature만 사용
-# - lstm,lstmattn,bert
-# (일반화) : 추가한 컬럼까지 범주형으로 사용
+model : lstm # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery_pre,lastquery_post, saint, lstmalbertattn,gLSTMConvATTN, gsaint, gsaintplus}
 
 wandb :
     using: False
@@ -18,12 +14,12 @@ wandb :
         - baseline
 
 ##main params
-task_name: model-gpt2-01
+task_name: model-megabert-01
 seed: 42
 device: cuda
 
 data_dir: /opt/ml/input/data/train_dataset
-file_name: train_data.csv
+file_name: train_final copy.csv
 # file_name : time_train.csv
 # file_name : train_inter_time (1).csv
 # file_name : train_time_finalfix.csv
@@ -44,11 +40,11 @@ num_workers: 1
 ##K-fold params
 use_kfold : True #n개의 fold를 이용하여 k-fold를 진행한다.
 use_stratify : False
-n_fold : 5
+n_fold : 2
 split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
-hidden_dim : 256
+hidden_dim : 512
 n_layers : 4
 n_heads : 4
 drop_out: 0.2
@@ -58,7 +54,7 @@ use_mask : True
 use_roll : False
 
 # Augmentation
-window : True # 슬라이딩 윈도우를 사용할 것인지
+window : False # 슬라이딩 윈도우를 사용할 것인지
 stride : 128
 shuffle : False
 shuffle_n : 3
@@ -68,10 +64,10 @@ concat_reverse : False
 
 #train
 n_epochs: 20
-batch_size: 256
+batch_size: 512
 lr: 0.0001
 clip_grad : 10
-patience : 20
+patience : 3
 log_steps : 50
 split_ratio : 0.8
 

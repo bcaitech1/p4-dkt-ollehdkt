@@ -122,9 +122,11 @@ def run_kfold(args, train_data, train_uid_df):
         trn_data = train_data[train_idx]
         val_data = train_data[valid_idx]
 
-        trn_data = data_augmentation(train_data,args)
-        
+        # trn_data = data_augmentation(train_data,args)
+        trn_data = data_augmentation(train_data[train_idx] ,args)
+
         train_loader, valid_loader = get_loaders(args, trn_data, val_data)
+        
 
         # only when using warmup scheduler
         args.total_steps = int(len(train_loader.dataset) / args.batch_size) * (args.n_epochs)
@@ -354,7 +356,7 @@ def inference(args, test_data):
         for id, p in enumerate(total_preds):
             w.write('{},{}\n'.format(id,p))
 
-def inference_kfold(args, test_data):
+def inference_kfold(args, test_data,test_uid_df):
     if args.model=='lgbm':
         return
     
@@ -392,18 +394,13 @@ def inference_kfold(args, test_data):
         else:
             oof_pred += fold_pred / args.n_fold
         
-
-
+    oof_df = test_uid_df
+    oof_df['preds'] = oof_pred
     new_output_path=f'{args.output_dir}/{args.task_name}'
-    write_path = os.path.join(new_output_path, "output.csv")
-
+    write_path = os.path.join(new_output_path, 'output.csv')
     if not os.path.exists(new_output_path):
-        os.makedirs(new_output_path)    
-    with open(write_path, 'w', encoding='utf8') as w:
-        print("writing prediction : {}".format(write_path))
-        w.write("id,prediction\n")
-        for id, p in enumerate(oof_pred):
-            w.write('{},{}\n'.format(id,p))
+        os.makedirs(new_output_path)
+    oof_df.to_csv(write_path, index=False)
 
 # 서빙을 위한 추론
 def inference_for_serving(args, test_data):

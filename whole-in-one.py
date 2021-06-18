@@ -13,7 +13,7 @@ import wandb
 
 from train import main as t_main
 from inference import main as i_main
-# from server import main as s_main
+from server import main as s_main
 from test import main as test_main
 
 import numpy as np

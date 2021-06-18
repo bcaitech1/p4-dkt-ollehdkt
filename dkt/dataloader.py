@@ -165,7 +165,8 @@ class Preprocess:
                 
             r = pd.DataFrame()
             # df['Timestamp'] = pd.to_datetime(df['Timestamp'].values)
-            
+            df = fe.make_feature(self.args,df)
+            df.drop(['solve_time'],axis=1, inplace=True)
             df = fe.feature_engineering_15(df)
             # print(min(df['rank_point']))
             # print(max(df['rank_point']))
@@ -226,11 +227,15 @@ class Preprocess:
 #         self.args.cont_cols = ['solve_time', 'test_t_mean',
 #        'test_t_std', 'test_t_skew', 'assess_t_mean', 'assess_t_std',
 #        'assess_t_skew', 'tag_t_mean', 'tag_t_std', 'tag_t_skew']
-        self.args.cate_cols = ['assessmentItemID','testId','KnowledgeTag',"test_level"]
+        self.args.cate_cols = ['assessmentItemID','testId','KnowledgeTag',"test_level","problem_number"]
         self.args.cont_cols = ['solve_time', 'mean_elapsed', 'test_time', 'grade_time', # 시간
             'answer_acc','tag_acc', 'test_acc', 'assess_acc', # 정답률
             'level_tag_acc', 'level_test_acc', 'level_assess_acc', # 대분류&정답률
-            'tag_cumAnswer',]
+            'tag_cumAnswer',"wrongP_time","correctP_time","test_mean","test_sum","ItemID_mean","tag_mean","tag_sum","test_t_mean"
+        ,"test_t_std","test_t_skew","assess_t_mean","assess_t_std","assess_t_skew","tag_t_mean","tag_t_std","tag_t_skew"
+        ,"test_tag_cumsum","user_total_correct_cnt","user_total_ans_cnt","user_total_acc","userID-solve_time-mean","userID-solve_time-std"
+        ,"userID-solve_time-skew"]
+        # self.args.cont_cols.extend(dohoon_feats)
          # 실험할 연속형 (user_acc)'solve_time', 'user_acc','user_correct_answer', 'user_total_answer',
         df = self.__preprocessing_v2(df, is_train)
 

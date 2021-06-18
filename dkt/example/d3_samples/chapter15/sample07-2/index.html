@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Sample</title>
+		<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+		<script src="http://d3js.org/d3.geo.projection.v0.min.js"></script>
+		<style>
+			svg { width: 640px; height: 640px; border: 1px solid black; background-color: #fff; }
+			path { fill : white; stroke: black; stroke-width: 0.5; }
+		</style>
+	</head>
+	<body>
+		<h1>좀 더 실감 나는 지구의 표시</h1>
+		<svg id="myGraph">
+			<defs>
+				<radialGradient id="grad" cx="0.55" cy="0.55" r="0.75" fx="0.25" fy="0.25">
+					<stop offset="0%" stop-color="#2f44ff"/>
+					<stop offset="100%" stop-color="#000000"/>
+				</radialGradient>
+			</defs>
+		</svg>
+		<script src="js/sample.js"></script>
+	</body>
+</html>

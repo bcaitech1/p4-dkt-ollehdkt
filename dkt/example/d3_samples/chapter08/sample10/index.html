@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Sample</title>
+		<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+		<style>
+			svg { width: 320px; height: 240px; border: 1px solid black; }
+		  .pie { fill: orange; stroke: white; }
+		  .total { font-size: 8pt; text-anchor: middle; }
+		  .pieNum { font-size: 15pt; color: white; text-anchor: middle; }
+		</style>
+	</head>
+	<body>
+		<h1>휴대전화 시장점유율 표시</h1>
+		<svg id="myGraph"></svg>
+		<form>
+			<select id="year">
+				<option value="2008">2008년</option>
+				<option value="2009">2009년</option>
+				<option value="2010">2010년</option>
+				<option value="2011">2011년</option>
+				<option value="2012">2012년</option>
+				<option value="2013">2013년</option>
+				<option value="2014">2014년</option>
+			</select>
+		</form>
+		<script src="js/sample.js"></script>
+	</body>
+</html>

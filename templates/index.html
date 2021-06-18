@@ -7,7 +7,8 @@
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6" crossorigin="anonymous">
         <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
         <script src="/static/Number-Rolling-Animation-jQuery-numberAnimate/numberAnimate.js"></script>
-
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        
         <style>
             html, body{
                 background-color: black;
@@ -58,16 +59,91 @@
                     font-size:45px !important;
                 }
             }
+            /* The Modal (background) */
+            .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1; /* Sit on top */
+            padding-top: 100px; /* Location of the box */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgb(0,0,0); /* Fallback color */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            }
+
+            /* Modal Content */
+            .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            }
+
+            /* The Close Button */
+            .close {
+            color: #aaaaaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            }
+
+            .close:hover,
+            .close:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+            }
+            .axisX text{
+                fill: green;
+                }
+            .axisY text{
+                fill: green
+            }
             
+            #table {display: table; width: 100%; height: 100%}
+            
+            
+            .row_table {
+                display: table-row;
+                height: 25%
+                }
+            .col_table {
+                display: table-cell; 
+                padding: 3px; 
+                border-bottom: 1px solid black;
+                width:25%
+                }
+            .css_table_text{color : black}
+            
+            /* 결과 버튼 */
+            #modalBtn {
+                background-color: #4CAF50; /* Green */
+                border: none;
+                color: white;
+                padding: 20px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 4px 2px;
+                cursor: pointer;
+                border-radius: 8px;
+                width : 20%;
+                font-size : 20px;
+                }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="row" style="padding:20px;">
-                <h1>BOOST QUIZ</h1>
+                <h1>Mini 수능</h1>
             </div>
             <p style="font-size:20px;">
-                정답이 없는 문제이므로, Yes를 누르면 정답 처리, No를 누르면 오답 처리를 합니다.<br>
+                정답이 있는 문제이므로, 각 문제에 맞는 번호를 입력하세요<br>
                 정답과 오답 비율을 다르게 가져가며 예측 점수가 달라지는 걸 확인해보세요.
             </p>
             <button type="button" id='start-btn' class="btn btn-primary btn-lg">START</button>
@@ -77,41 +153,143 @@
             <div class="row justify-content-lg-center">
                 <div class="col col-lg-auto" id="question-section" style="opacity:0" data-started='false'>
                     <h2>문제 <span id="q-number">1</span></h2>
+                    <p id="question-text"><span id="tag"></span> </p>
                     <div class="game-box">
                         <div class="">
                             <img id='question-image' class="rounded mx-auto d-block" 
                             src="https://source.unsplash.com/random/400x300"/>
-                            <p id="question-text">위의 그림은 <span id="tag"></span>입니까? </p>
+                            
                         </div>
+                        <!-- 버튼 -->
                         <div class="row" style="margin-top:20px;">
-                            <div class="col-sm-6">
-                                <button type="button" data-answer='1' class="btn btn-primary btn-lg answer-btn">Yes</button>
+                            <div class="col-sm-2">
+                                <button type="button" data-answer='1' class="btn btn-primary btn-lg answer-btn">1</button>
                             </div>
-                            <div class="col-sm-6">
-                                <button type="button" data-answer='0'class="btn btn-danger btn-lg answer-btn">No</button>
+                            <div class="col-sm-2">
+                                <button type="button" data-answer='2'class="btn btn-primary btn-lg answer-btn">2</button>
+                            </div>
+                            <div class="col-sm-2">
+                                <button type="button" data-answer='3'class="btn btn-primary btn-lg answer-btn">3</button>
+                            </div>
+                            <div class="col-sm-2">
+                                <button type="button" data-answer='4'class="btn btn-primary btn-lg answer-btn">4</button>
+                            </div>
+                            <div class="col-sm-2">
+                                <button type="button" data-answer='5'class="btn btn-primary btn-lg answer-btn">5</button>
                             </div>
                         </div>
                     </div>
                     
                 </div>
                 <div id="result" style="display:none;">
-                    <h3>Your predicted score is:</h3>
+                    <!-- <div id="result"> -->
+                    <h3>그대가 다음 문제를 맞출 확률:</h3>
                     <span id="value">0</span> / 100
-                    <p>새로고침 후에 다시 시도해보세요!</p>
+                    <p>새로고침 후에 다시 시도해보세요! - (TEST)</p>
+                    <button id="modalBtn" disabled>Result</button>
+                    <!-- The Modal -->
+                    <div id="myModal" class="modal">
+
+                        <!-- Modal content -->
+                        <div class="modal-content">
+                            <span class="close">&times;</span>
+                            <p id="result_title" style="font-size: 50px; color: blue;">Result</p>
+                            <script src="static/bar-graph.js"></script>
+                            
+                            <div id="table">
+                                <div class="row_table">
+                                    <div class="col_table css_table_text">Graph1</div>
+                                    <div class="col_table css_table_text">Graph2</div>
+                                </div>
+                                <div class="row_table">
+                                    <div class="col_table css_table_text">
+                                        <div id="graph1">
+                                                
+                                        </div>
+                                    </div>
+                                    <div class="col_table css_table_text">
+                                        <div id="graph2">
+                                                
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row_table">
+                                    <div class="col_table css_table_text">Graph3</div>
+                                    <div class="col_table css_table_text">Graph4</div>
+                                </div>
+                                <div class="row_table">
+                                    <div class="col_table css_table_text">
+                                        <div id="graph3">
+                                                
+                                        </div>
+                                    </div>
+                                    <div class="col_table css_table_text">
+                                        <div id="graph4">
+                                                
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    
+                    </div>
+                    <script>
+                        const openModal = () =>{
+                            // Get the modal
+                            var modal = document.getElementById("myModal");
+
+                            // Get the button that opens the modal
+                            var btn = document.getElementById("modalBtn");
+
+                            // Get the <span> element that closes the modal
+                            var span = document.getElementsByClassName("close")[0];
+
+                            // When the user clicks the button, open the modal 
+                            btn.onclick = function() {
+                            modal.style.display = "block";
+                            }
+
+                            // When the user clicks on <span> (x), close the modal
+                            span.onclick = function() {
+                            modal.style.display = "none";
+                            }
+
+                            // When the user clicks anywhere outside of the modal, close it
+                            window.onclick = function(event) {
+                            if (event.target == modal) {
+                                modal.style.display = "none";
+                            }
+                            }    
+                        }
+                        openModal();
+                    </script>
                 </div>
-                
             </div>
             
 
         </div>
         <script>
-            var QUESTION_LIST = [
-                    {'q_content':'사람', 'tag':7597, 'test_id':'A010000060', 'assess_id':'A010060001'},
-                    {'q_content':'동물', 'tag':397, 'test_id':'A050000094', 'assess_id':'A050094005'},
-                    {'q_content':'자연', 'tag':451, 'test_id':'A050000155', 'assess_id':'A050155004'},
-                    {'q_content':'물건', 'tag':587, 'test_id':'A060000017', 'assess_id':'A060017006'},
-                    {'q_content':'실제', 'tag':4803, 'test_id':'A080000031', 'assess_id':'A080031001'},
-                ];
+            var QUESTION_LIST = []
+
+    // assessmentItemID = db.Column(db.String(20),primary_key=True) # 문항 번호
+    // testId = db.Column(db.String(20)) # 문제지 번호
+    // KnowledgeTag = db.Column(db.String(20)) # 문제 유형
+    // real_answer = db.Column(db.Integer) # 실제 답
+    // img_url = db.Column(db.String(256)) # 이미지 저장 경로
+    // q_content = db.Column(db.String(256)) # 문제 설명
+
+            {% for q in questions %}
+                QUESTION_LIST.push({
+                    assessmentItemID : "{{q.assessmentItemID}}",
+                    testId : "{{q.testId}}",
+                    KnowledgeTag : {{q.KnowledgeTag}},
+                    real_answer : {{q.real_answer}},
+                    img_url : "{{q.img_url}}",
+                    q_content : "{{q.q_content}}"
+                })
+            {% endfor %}
+
+            console.log(QUESTION_LIST)
             var answers = [];
             function getRandomIntInclusive(min, max) {
                 min = Math.ceil(min);
@@ -125,23 +303,32 @@
                 document.querySelector("#tag").innerHTML = q_content;
                 document.querySelector("#q-number").innerHTML = index+1;
                 
-                
-                
                 //이미지 URL을 다르게 해야 짧은 시간 내의 재요청시에도 다른 이미지가 나옴
                 var height = getRandomIntInclusive(290,310);
                 var width = getRandomIntInclusive(390,410);
-                var url = `https://source.unsplash.com/random/${width}x${height}`;
+                // var url = `https://source.unsplash.com/random/${width}x${height}`;
+                let url = QUESTION_LIST[index].img_url
                 
-                
-                document.querySelector("#question-image").src = url;
-                
+                document.querySelector("#question-image").src = `static/problems/${url}`;
                 
             }
             
+            
             function get_score(){
+                // print(QUESTION_LIST)
+                
+                real_answer = []
+                for(let ra of QUESTION_LIST){
+                    real_answer.push(ra.real_answer)
+                }
+
                 for (var i = 0; i < QUESTION_LIST.length; i++) {
-                    QUESTION_LIST[i]['answer'] = answers[i]
-                    
+                    if(answers[i]==real_answer[i]){
+                        QUESTION_LIST[i]['answer'] = answers[i] = 1
+                    }
+                    else{
+                        QUESTION_LIST[i]['answer'] = answers[i] = 0
+                    }
                 }
 
                 fetch('/get_score', {
@@ -161,11 +348,11 @@
                     }
                 })
                 .catch(error => console.error('Error:', error));
-
-
             }
 
             var isClicked = false;
+        //             데이터 세트는 HTML 표준에 정의된 기능
+        // DOM요소에 값을 저장, JS 코드로 값을 읽어들일 수 있음
             document.addEventListener('click', function (event) {
                 if (!event.target.closest('.btn')) return;
                 if (event.target.closest('.answer-btn')){
@@ -180,6 +367,10 @@
                     if (index==5){
                         setTimeout(function(){
                             get_score();
+                            bar_graph(1);
+                            bar_graph(2);
+                            bar_graph(3);
+                            bar_graph(4);
                         },1000);
                     }else{
                         setTimeout(function(){
@@ -212,6 +403,7 @@
                 var stepTime = Math.abs(Math.floor(duration / range));
                 var obj = document.getElementById(id);
                 var timer = setInterval(function() {
+                    //setInterval : 일정한 간격으로 함수를 수행함
                     current += increment;
                     obj.innerHTML = current;
                     if (current == end) {
@@ -219,8 +411,6 @@
                     }
                 }, stepTime);
             }
-
-        
         </script>
     </body>
 </html>

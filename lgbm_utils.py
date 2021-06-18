@@ -32,8 +32,6 @@ def make_sharing_feature(args):
     tdf=tdf[tdf['userID']==tdf['userID'].shift(-1)]
     df=pd.concat([df,tdf],ignore_index=True)
     return df
-
-
 def get_sharing_feature(args):
     if args.make_sharing_feature:
         df=make_sharing_feature(args)
@@ -46,12 +44,33 @@ def get_sharing_feature(args):
     KnowledgeTag_mean_sum = df.groupby(['KnowledgeTag'])['answerCode'].agg(['mean', 'sum']).to_dict()
     
     # 시간 피처
-    
     testId_time_agg = df.groupby(['testId'])['solve_time'].agg(['mean','std','skew']).to_dict()
     assessment_time_agg=df.groupby(['assessmentItemID'])['solve_time'].agg(['mean','std','skew']).to_dict()
     KnowledgeTag_time_agg = df.groupby(['KnowledgeTag'])['solve_time'].agg(['mean','std','skew']).to_dict()
+    #해당 문제를 맞은사람의 평균시간과 틀린사람의 평균시간
+    a_t_rate_df=df.groupby(['assessmentItemID','answerCode']).agg({'solve_time':'mean'}).reset_index(drop=False)
+    assess_time_corNwrong_agg=a_t_rate_df.groupby('assessmentItemID')['solve_time'].agg(['first','last']).to_dict()
+    print("lgbm feature처럼 사용")
+    return testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg,assess_time_corNwrong_agg
 
-    return testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg
+# def get_sharing_feature(args):
+#     if args.make_sharing_feature:
+#         df=make_sharing_feature(args)
+#     else :
+#         csv_file_path = os.path.join(args.data_dir, args.file_name)
+#         df = pd.read_csv(csv_file_path)#, nrows=100000)
+#     # trian에서 각 문제 평균 뽑기
+#     testId_mean_sum = df.groupby(['testId'])['answerCode'].agg(['mean','sum']).to_dict()
+#     assessmentItemID_mean_sum = df.groupby(['assessmentItemID'])['answerCode'].agg(['mean', 'sum']).to_dict()
+#     KnowledgeTag_mean_sum = df.groupby(['KnowledgeTag'])['answerCode'].agg(['mean', 'sum']).to_dict()
+    
+#     # 시간 피처
+    
+#     testId_time_agg = df.groupby(['testId'])['solve_time'].agg(['mean','std','skew']).to_dict()
+#     assessment_time_agg=df.groupby(['assessmentItemID'])['solve_time'].agg(['mean','std','skew']).to_dict()
+#     KnowledgeTag_time_agg = df.groupby(['KnowledgeTag'])['solve_time'].agg(['mean','std','skew']).to_dict()
+
+#     return testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg
 
 def make_lgbm_feature(args, df,is_train=True):
     # testId_mean_sum, assessmentItemID_mean_sum, KnowledgeTag_mean_sum,testId_time_agg,assessment_time_agg,KnowledgeTag_time_agg=get_sharing_feature(args)

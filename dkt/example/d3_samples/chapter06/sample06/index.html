@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Sample</title>
+		<script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+		<style>
+			svg { width: 320px; height: 240px; border: 1px solid black; }
+			.bar { fill : orange; }
+		</style>
+	</head>
+	<body>
+		<h1>데이터에 따라 그래프 표시</h1>
+		<div>
+			<button data-src="mydata1.csv">mydata1.csv 불러오기</button>
+			<button data-src="mydata2.csv">mydata2.csv 불러오기</button>
+			<button data-src="mydata3.csv">mydata3.csv 불러오기</button>
+		</div>
+		<svg id="myGraph"></svg>
+		<script src="js/sample.js"></script>
+	</body>
+</html>

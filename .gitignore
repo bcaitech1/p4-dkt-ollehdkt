@@ -24,3 +24,6 @@ dkt/toy_project_solution
 src
 static
 templates
+
+db.sqlite
+README copy.md
