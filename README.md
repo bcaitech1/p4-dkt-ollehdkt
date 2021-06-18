@@ -187,7 +187,7 @@ Team Rank : 7 , AUROC : 0.8362, Accuracy : 0.7527
 
 　✳ 주성분 분석 결과 - 20개의 주성분
 
-![image10](https://github.com/bcaitech1/p4-dkt-ollehdkt/blob/headbreakz/image/PCA.png?raw=true)
+![image10](https://github.com/bcaitech1/p4-dkt-ollehdkt/blob/chaewon/image/PCA.png?raw=true)
 
 ➡ ensemble
 
