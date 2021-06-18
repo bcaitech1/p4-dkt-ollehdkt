@@ -20,10 +20,15 @@ __pycache__
 
 serving_args.py
 dkt/__pycache__
-dkt/toy_project_solution
+
 src
 static
 templates
 
 db.sqlite
 README copy.md
+
+dkt/toy_project_solution
+dkt/example/d3_samples
+dkt/example
+serving
