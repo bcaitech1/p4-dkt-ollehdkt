@@ -1,4 +1,9 @@
-model : lstm    # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint}
+
+model : lstmattn   # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery, saint, lstmalbertattn}
+ 
+# (비일반화) : base feature만 사용
+# - lstm,lstmattn,bert
+# (일반화) : 추가한 컬럼까지 범주형으로 사용
 
 wandb :
     using: False
@@ -10,7 +15,7 @@ wandb :
         - baseline
 
 ##main params
-task_name: target_check
+task_name: lstmattn_k-fold
 seed: 42
 device: cuda
 
