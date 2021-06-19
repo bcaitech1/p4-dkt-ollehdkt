@@ -135,18 +135,67 @@
                 width : 20%;
                 font-size : 20px;
                 }
+            #refreshBtn{
+                background-color: #4CAF50; /* Green */
+                border: none;
+                color: white;
+                padding: 20px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 4px 2px;
+                cursor: pointer;
+                border-radius: 8px;
+                width : 20%;
+                font-size : 20px;
+                }
+            #inputname{
+                width: 300px;
+            }
+            @font-face {
+            font-family: "OLLEHFONT";
+            src: url("/static/OLLEHFONT.ttf");
+            }
+            
+            #title{
+                font-family: "OLLEHFONT";
+            }
+            #olleh_red{
+                font-family: "OLLEHFONT";
+                color : red
+            }
+            #olleh_white{
+                font-family: "OLLEHFONT";
+                color : white
+            }
+            
         </style>
     </head>
     <body>
         <div class="container">
             <div class="row" style="padding:20px;">
-                <h1>Mini 수능</h1>
+                <h1 id="title">Mini 수능</h1>
             </div>
             <p style="font-size:20px;">
                 정답이 있는 문제이므로, 각 문제에 맞는 번호를 입력하세요<br>
                 정답과 오답 비율을 다르게 가져가며 예측 점수가 달라지는 걸 확인해보세요.
             </p>
-            <button type="button" id='start-btn' class="btn btn-primary btn-lg">START</button>
+            <div>
+                <p id="inputplz">당신의 이름을 입력하세요</p><br>
+                <input type="text" id="inputname" placeholder="2~20자로 입력, 영어만 or 한글만"/>
+                <div id = "divspace">
+                    <br>
+                    <br>
+                    <br>
+                </div>
+            </div>
+            <button type="button" id='start-btn' class="btn btn-primary btn-lg" disabled>START</button>
+            <div id="footer">
+                <br>
+                Reference : BoostCamp AI Tech<br>
+                <p id = "ollehdkt">created by <span id="olleh_red">Olleh</span><span id="olleh_white"> dkt</span></p>
+            </div>
             <div class="spinner-grow" id='spinner' role="status" style="display:none;">
                 <span class="sr-only"></span>
             </div>
@@ -183,10 +232,11 @@
                 </div>
                 <div id="result" style="display:none;">
                     <!-- <div id="result"> -->
-                    <h3>그대가 다음 문제를 맞출 확률:</h3>
+                    <h3 id="display_prob">그대가 다음 문제를 맞출 확률:</h3>
                     <span id="value">0</span> / 100
-                    <p>새로고침 후에 다시 시도해보세요! - (TEST)</p>
-                    <button id="modalBtn" disabled>Result</button>
+                    <p>Refresh를 눌러 다시 도전하세요! - (TEST)</p>
+                    <button id="modalBtn" disabled>Result(disabled)</button>
+                    <button id="refreshBtn">Refresh</button>
                     <!-- The Modal -->
                     <div id="myModal" class="modal">
 
@@ -262,6 +312,15 @@
                             }    
                         }
                         openModal();
+                        const refresh = () =>{
+                            let btn = document.getElementById("refreshBtn")
+                            let cnt=1; // 변수 지정안하면 무한 새로고침 하게 됨
+                            if (cnt==1){
+                                btn.onclick = ()=>{document.location.reload()} 
+                            }
+                            cnt=0;
+                        }
+                        refresh();
                     </script>
                 </div>
             </div>
@@ -277,7 +336,7 @@
     // real_answer = db.Column(db.Integer) # 실제 답
     // img_url = db.Column(db.String(256)) # 이미지 저장 경로
     // q_content = db.Column(db.String(256)) # 문제 설명
-            //
+            
             {% for q in questions %}
                 QUESTION_LIST.push({
                     assessmentItemID : "{{q.assessmentItemID}}",
@@ -312,7 +371,32 @@
                 document.querySelector("#question-image").src = `static/problems/${url}`;
                 
             }
+
+            const chkName = (name) => {
+                
+                let hanPattern = /^[가-힣]{2,20}$/;
+                let engPattern = /^[a-zA-Z]{2,20}$/;
+
+                if(hanPattern.test(name) || engPattern.test(name) )
+                    return true;
+                
+                return false;
+            }
             
+            document.addEventListener('keyup',event=>{
+                if(event.target.closest('#inputname')){
+                    let inputname_01 = document.querySelector('#inputname').value
+                    let start_btn = document.querySelector('#start-btn')
+                    let inputLen = inputname_01.length;
+                    // console.log("확인", chkName(inputname_01))
+                    if(!chkName(inputname_01))
+                        {
+                        start_btn.disabled = true
+                        }
+                    else
+                        start_btn.disabled = false
+                }
+            })
             
             function get_score(){
                 // print(QUESTION_LIST)
@@ -343,6 +427,8 @@
                     document.querySelector("#spinner").style.display = 'none';
                     document.querySelector("#question-section").style.display = 'none';
                     document.querySelector("#result").style.display = 'block';
+                    let inputname = document.querySelector("#inputname").value
+                    document.querySelector("#display_prob").innerHTML = `${inputname}님이 수리영역 가형에서 다음 문제를 맞출 확률`;
                     if (score != 0){
                         animateValue("value", 0, JSON.stringify(response), 3000)
                     }
@@ -350,8 +436,10 @@
                 .catch(error => console.error('Error:', error));
             }
 
+            
+
             var isClicked = false;
-        //             데이터 세트는 HTML 표준에 정의된 기능
+        // 데이터 세트는 HTML 표준에 정의된 기능
         // DOM요소에 값을 저장, JS 코드로 값을 읽어들일 수 있음
             document.addEventListener('click', function (event) {
                 if (!event.target.closest('.btn')) return;
@@ -382,7 +470,11 @@
                 }else if (event.target.closest('#start-btn')){
                     document.querySelector("#question-section").dataset.started = true;
                     document.querySelector("#start-btn").style.display='none';
+                    document.querySelector("#divspace").style.display='none';
+                    document.querySelector("#inputname").style.display='none';
+                    document.querySelector("#inputplz").style.display='none';
                     document.querySelector("#spinner").style.display = 'inline-block';
+                    document.querySelector("#footer").style.display = 'none';
                     set_question(0);
                 }
             });
