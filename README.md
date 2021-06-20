@@ -14,5 +14,9 @@
 ### 4. $ python3 submit.py
 key와 파일path를 입력하면 다운로드할 필요 없이 서버에서 바로 제출
 
-## lgbm 합치기
-### 1. __feature_engineering
+## 구현한 파트
+- lgbm을 기존 NN모델 파이프라인에 통합
+- NN모델에 범주/연속형 피처를 자유롭게 넣을 수 있게 수정
+- solve_time관련 feature 생성
+- user_split k-fold 구현
+- 모든 모델 실험  
