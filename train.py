@@ -10,12 +10,37 @@ import json
 import argparse
 from attrdict import AttrDict
 
+import mlflow
 
 def main(args):
     if args.wandb.using:
         wandb.init(project=args.wandb.project, entity=args.wandb.entity)
         wandb.run.name = args.task_name
         wandb.util.generate_id()
+
+    if args.mlflow.using:
+        print(f"Use MLflow OK... for exp_name : {args.mlflow.experiment}")
+        try:
+            #프로젝트 별로 이름을 다르게 가져가면서 실험들을 기록
+            mlflow.create_experiment(name=args.mlflow.experiment)
+            
+        except:
+            print('Exist experiment')
+        # mlflow.create_experiment(name=args.mlflow.experiment)
+        mlflow.set_experiment(args.mlflow.experiment)
+        #mlflow에 기록할 준비
+        mlflow.start_run()
+        mlflow.set_tag('version', '0.1')
+
+        # 모델 하이퍼 파라미터 설정
+        params = {
+            'learning_rate' : args.lr,
+            'n_epochs' : args.n_epochs,
+            'batch_size' : args.batch_size
+        }
+
+        mlflow.set_experiment(args.mlflow.experiment)
+        mlflow.log_params(params)
     
     setSeeds(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -32,10 +57,10 @@ def main(args):
         
         print(len(train_data))
         
-        # train_data, valid_data = preprocess.split_data(train_data, ratio=args.split_ratio, seed=args.seed)
+        train_data, valid_data = preprocess.split_data(train_data, ratio=args.split_ratio, seed=args.seed)
 
-        # train_data = data_augmentation(train_data,args)
-        # trainer.run(args, train_data, valid_data)
+        train_data = data_augmentation(train_data,args)
+        trainer.run(args, train_data, valid_data)
     
 
 if __name__ == "__main__":

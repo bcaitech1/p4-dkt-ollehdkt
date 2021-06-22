@@ -1,8 +1,33 @@
 work : 'server' # 'train_and_inference','tuning', 'server', 'test'
 
+# # {% for q in questions %}
+#             //     QUESTION_LIST.push({
+#             //         assessmentItemID : "{{q.assessmentItemID}}",
+#             //         testId : "{{q.testId}}",
+#             //         KnowledgeTag : {{q.KnowledgeTag}},
+#             //         real_answer : {{q.real_answer}},
+#             //         img_url : "{{q.img_url}}",
+#             //         q_content : "{{q.q_content}}"
+#             //     })
+#             // {% endfor %}
+
 # 모델 : 일반화된 모델을 사용하고 싶으면, g를 붙일 것
-# 미 일반화된 모델 : LSTM, Bert
+# 서빙은 항상 lstm
 model : lstm # {lstm, lstmattn, bert, lgbm, lstmroberta, lastquery_pre,lastquery_post, saint, lstmalbertattn,gLSTMConvATTN, gsaint, gsaintplus}
+
+# 모델 서빙
+# mlflow gui에 접속하여 방금 훈련을 마친 모델의 실험 기록을 확인 한우에, 모델 디렉토리를 복사
+
+# 모델 디렉토리 예: file:///Users/Tom/projects/9rkd/mlruns/1/a69f1d42be0e404097c19e3d2cd7fb7a/artifacts/save_model
+# 터미널에 아래 명령어 입력
+
+# mlflow GUI와 포트가 겹치지 않도록 8890으로 실행
+
+# mlflow models serve -m <saved-model-dir> --no-conda -h 0.0.0.0 -p 8890
+# 주의 : mlflow ui -h 0.0.0.0 -p 8889
+mlflow :
+    using : True
+    experiment : 'pytorch-test'
 
 wandb :
     using: False
@@ -38,13 +63,13 @@ max_seq_len: 128
 num_workers: 1
 
 ##K-fold params
-use_kfold : True #n개의 fold를 이용하여 k-fold를 진행한다.
+use_kfold : False #n개의 fold를 이용하여 k-fold를 진행한다.
 use_stratify : False
 n_fold : 2
 split_by_user : False #k-fold를 수행할 dataset을 user 기준으로 split
 
 ##모델
-hidden_dim : 512
+hidden_dim : 256
 n_layers : 4
 n_heads : 4
 drop_out: 0.2
@@ -63,7 +88,7 @@ shuffle_n : 3
 concat_reverse : False
 
 #train
-n_epochs: 20
+n_epochs: 2
 batch_size: 512
 lr: 0.0001
 clip_grad : 10

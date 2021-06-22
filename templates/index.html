@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>BOOST QUIZ</title>
+        <title>OLLEH DKT</title>
         
         
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6" crossorigin="anonymous">
@@ -10,6 +10,13 @@
         <script src="https://d3js.org/d3.v7.min.js"></script>
         
         <style>
+            @font-face {
+            font-family: "OLLEHFONT";
+            src: url("/static/OLLEHFONT.ttf");
+            }
+            *{
+                font-family: "OLLEHFONT";
+            }
             html, body{
                 background-color: black;
                 color:#fff;
@@ -34,8 +41,7 @@
                 font-size:15px;
             }
             #value{
-                font-size: 100px;
-
+                font-size: 50px;
             }
             #question-section{
                 transition: opacity 0s, opacity 0.5s linear;
@@ -76,7 +82,9 @@
 
             /* Modal Content */
             .modal-content {
-            background-color: #fefefe;
+            /* background-color: #fefefe;
+             */
+            background-color: #FAFAD2;
             margin: auto;
             padding: 20px;
             border: 1px solid #888;
@@ -85,7 +93,8 @@
 
             /* The Close Button */
             .close {
-            color: #aaaaaa;
+            /* color: #aaaaaa; */
+            color : white;
             float: right;
             font-size: 28px;
             font-weight: bold;
@@ -124,6 +133,7 @@
                 background-color: #4CAF50; /* Green */
                 border: none;
                 color: white;
+                /* 123/103/220 */
                 padding: 20px;
                 text-align: center;
                 text-decoration: none;
@@ -135,7 +145,7 @@
                 width : 20%;
                 font-size : 20px;
                 }
-            #refreshBtn{
+            #refreshBtn, #restartBtn{
                 background-color: #4CAF50; /* Green */
                 border: none;
                 color: white;
@@ -153,12 +163,13 @@
             #inputname{
                 width: 300px;
             }
-            @font-face {
-            font-family: "OLLEHFONT";
-            src: url("/static/OLLEHFONT.ttf");
+            #inputname::placeholder{
+                color : lightslategray;
+                font-family : "OLLEHFONT";
             }
             
-            #title{
+            
+            #title, #inputplz, #result01, #result02{
                 font-family: "OLLEHFONT";
             }
             #olleh_red{
@@ -169,7 +180,183 @@
                 font-family: "OLLEHFONT";
                 color : white
             }
-            
+            #result01{
+                color : skyblue
+            }
+
+            /*select*/
+            #select{
+                width : 80%;
+                background-color: black;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            #select-btn{
+                background-color: skyblue; /* Green */
+                border: none;
+                color: white;
+                padding: 20px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 4px 2px;
+                cursor: pointer;
+                border-radius: 8px;
+                width : 400px;
+                height: 100px;
+                font-size : 20px;
+                }
+            #searchFilter-area{
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                background-color: black;
+                align-items: center;
+                height: 300px;
+                /* overflow: scroll; */
+            }
+            /* Search Filter */
+            #myInput {
+            background-image: url('/css/searchicon.png');
+            background-position: 10px 12px;
+            background-repeat: no-repeat;
+            width: 400px;
+            font-size: 12px;
+            padding: 12px 20px 12px 40px;
+            border: 1px solid #ddd;
+            margin-bottom: 12px; 
+            }
+
+            #myUL {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            width: 400px;
+            }
+
+            #myUL li a {
+            border: 1px solid #ddd;
+            margin-top: -1px; /* Prevent double borders */
+            background-color: #f6f6f6;
+            padding: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            color: black;
+            display: block
+            }
+
+            #myUL li a:hover:not(.header) {
+            background-color: #eee;
+            }
+
+            #selected-tag{
+                color: skyblue;
+            }
+
+            .next_button {
+            width: 100px;
+            display: inline-block;
+            padding: 15px 25px;
+            font-size: 24px;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            outline: none;
+            color: #fff;
+            background-color: #4CAF50;
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 9px #999;
+            margin-bottom: 10px;
+            }
+
+            .next_button:hover {background-color: #3e8e41}
+
+            .next_button:active {
+            background-color: #3e8e41;
+            box-shadow: 0 5px #666;
+            transform: translateY(4px);
+            }
+
+            #next_button_area {
+                width: 1000px;
+                height:70%;
+                margin: 20px;
+                background-color: black;
+            }
+            .button_ext{
+            background-color: #4CAF50; /* Green */
+            border: none;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            width: 100px;
+            }
+            #exdiv{
+                display: flex;
+                background-color: chocolate;
+                width: 400px;
+                height: 400px;
+                flex-direction: column;
+                align-items: center;
+            }
+            #div1{
+                width: 100px;
+                height: 100px;
+                background-color: cadetblue;
+            }
+            #div2{
+                width: 100px;
+                height: 100px;
+                background-color: chartreuse;
+            }
+            #div3{
+                width: 100px;
+                height: 100px;
+                background-color: cornflowerblue;
+            }
+            #inner-select{
+                width: 100%;
+                height: 50px;
+                background-color: slateblue;
+            }
+            #first-result-table{
+                border: 1px solid black;
+                border-top : 1px solid black;
+                border-right : 1px solid black;
+                border-bottom: 1px solid black;
+                border-left: 1px solid black;
+                color: black;
+                border-collapse: collapse;
+            }
+            .problem-columns{
+                width: 100px;
+                background-color: rgb(123, 103, 220);
+                color : white;
+                border: 1px solid black;
+            }
+            .other-columns{
+                width: 100px;
+                /* style="background-color : rgba(123,103,220) */
+                background-color: rgb(161, 152, 207);
+                color : black;
+                border: 1px solid black;
+            }
+            .result-legend{
+                width: 80px;
+                background-color: rgba(123,103,220);
+                color : white;
+                border: 1px solid black;
+            }
+            .problem-area{
+                text-align: left;
+            }
         </style>
     </head>
     <body>
@@ -177,12 +364,13 @@
             <div class="row" style="padding:20px;">
                 <h1 id="title">Mini 수능</h1>
             </div>
-            <p style="font-size:20px;">
-                정답이 있는 문제이므로, 각 문제에 맞는 번호를 입력하세요<br>
-                정답과 오답 비율을 다르게 가져가며 예측 점수가 달라지는 걸 확인해보세요.
-            </p>
+            <!-- <p style="font-size:20px;">
+                자, 이제 시작이야~, 내 꿈을~🎶 <br>
+                내 꿈을 위한 여행, 피카츄 <br>
+                - 포켓몬스터 무인편 OST(1999) 중에서 -
+            </p> -->
             <div>
-                <p id="inputplz">당신의 이름을 입력하세요</p><br>
+                <p id="inputplz">당신의 <span style="color : skyblue;">이름</span>을 입력하세요</p><br>
                 <input type="text" id="inputname" placeholder="2~20자로 입력, 영어만 or 한글만"/>
                 <div id = "divspace">
                     <br>
@@ -199,15 +387,73 @@
             <div class="spinner-grow" id='spinner' role="status" style="display:none;">
                 <span class="sr-only"></span>
             </div>
+            <input type="hidden" id="input-selected-tag" />
+            <input type="hidden" id="solve-problem-step" />
+            <input type="hidden" id="tags-hidden">
+            <input type="hidden" id="first-score">
+            <input type="hidden" id="second-score">
+            <!-- <div id ="exdiv">
+                <div id="div1">
+                </div>
+                <div id="div2">
+                </div>
+                <div id="div3">
+                </div>
+            </div> -->
+            <div id="select" style="display:none;" data-select="false">
+                    
+                    <div id="searchFilter-area">
+                        <!-- <div id="inner-select">
+
+                        </div> -->
+                        <input type="text" id="myInput" onkeyup="searchFilter()" placeholder="문제 유형 검색" title="Type in a name">
+                        <!-- <ul id="myUL" style="display: none;"> -->
+                            <ul id="myUL" >
+                            </ul>
+                    <script>
+                        function searchFilter() {
+                            var input, filter, ul, li, a, i, txtValue;
+                            input = document.getElementById("myInput");
+                            console.log(input.value.length);
+                            if(input.value.length>0){
+                                document.querySelector("#myUL").style.display = "";
+                                
+                            }
+                            else if(input.value.length==0){
+                                document.querySelector("#myUL").style.display = "block";
+                            }
+                            else{
+                                document.querySelector("#myUL").style.display = "none";
+                            }
+                            filter = input.value.toUpperCase();
+                            ul = document.getElementById("myUL");
+                            li = ul.getElementsByTagName("li");
+                            for (i = 0; i < li.length; i++) {
+                                a = li[i].getElementsByTagName("a")[0];
+                                txtValue = a.textContent || a.innerText;
+                                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                                    li[i].style.display = "";
+                                } else {
+                                    li[i].style.display = "none";
+                                }
+                            }
+                        }
+                    </script>
+                    </div>
+                    <div id="select-btn-area">
+                        <p>선택 유형 : <span id="selected-tag" onchange='cha();'></span></p>
+                        <button type="button" id='select-btn' class="btn" disabled>SELECT</button>
+                    </div>
+            </div>
             <div class="row justify-content-lg-center">
                 <div class="col col-lg-auto" id="question-section" style="opacity:0" data-started='false'>
                     <h2>문제 <span id="q-number">1</span></h2>
                     <p id="question-text"><span id="tag"></span> </p>
+                    <p id="test-fetch"></p>
                     <div class="game-box">
                         <div class="">
-                            <img id='question-image' class="rounded mx-auto d-block" 
+                            <img id='question-image' class="rounded mx-auto d-block" style="width: 500px; height: 500px;"
                             src="https://source.unsplash.com/random/400x300"/>
-                            
                         </div>
                         <!-- 버튼 -->
                         <div class="row" style="margin-top:20px;">
@@ -230,28 +476,99 @@
                     </div>
                     
                 </div>
+                <div id="mid_result" style="display: none;">
+                    <p id="recommend">유형을 바꾸시겠습니까?</p><br>
+                    <p>현재 예측 수준도 : <span id="mid_score"></span></p>
+                    <!-- <button id="next_button">Next</button>
+                    <br>
+                    <p>다른 유형 선택</p>
+                    <div id="next_button_area">
+                    </div> -->
+                </div>
                 <div id="result" style="display:none;">
                     <!-- <div id="result"> -->
-                    <h3 id="display_prob">그대가 다음 문제를 맞출 확률:</h3>
+                    <h3 id="display_prob">당신이 더 잘할 확률</h3>
                     <span id="value">0</span> / 100
-                    <p>Refresh를 눌러 다시 도전하세요! - (TEST)</p>
-                    <button id="modalBtn" disabled>Result(disabled)</button>
+                    <p>Refresh를 눌러 다시 도전하세요!</p>
+                    <button id="modalBtn">결과 확인</button>
                     <button id="refreshBtn">Refresh</button>
+                    <!-- <button id="restartBtn" disabled>성적표</button> -->
                     <!-- The Modal -->
                     <div id="myModal" class="modal">
-
                         <!-- Modal content -->
                         <div class="modal-content">
                             <span class="close">&times;</span>
-                            <p id="result_title" style="font-size: 50px; color: blue;">Result</p>
+                            <p id="result_title" style="font-size: 50px; color: rgba(123,103,220);">Result</p>
                             <script src="static/bar-graph.js"></script>
                             
                             <div id="table">
                                 <div class="row_table">
-                                    <div class="col_table css_table_text">Graph1</div>
-                                    <div class="col_table css_table_text">Graph2</div>
+                                    <!-- <div class="col_table css_table_text">Graph1</div>
+                                    <div class="col_table css_table_text">Graph2</div> -->
+                                    <div class="problem-area">
+                                        <p style="color: black;">1차 풀이</p>
+                                    </div>
+                                    
+                                    <div id="first-result-area">
+                                        <table id="first-result-table">
+                                            <tr>
+                                                <td class="result-legend">문제</td>
+                                                <td class="problem-columns">1</td>
+                                                <td class="problem-columns">2</td>
+                                                <td class="problem-columns">3</td>
+                                                <td class="problem-columns">4</td>
+                                                <td class="problem-columns">5</td>
+                                                <td class="problem-columns">정답률</td>
+                                                <td class="problem-columns">예측점수</td>
+                                            </tr>
+                                            <!-- 123/103/220 -->
+                                            <tr id="tr-value-01">
+                                                <!-- <td class="result-legend">맞춘 여부</td>
+                                                <td class="other-columns"><span style="color: red;">X</span></td>
+                                                <td class="other-columns"><span style="color: blue;">O</span></td>
+                                                <td class="other-columns"><span style="color: red;">X</span></td>
+                                                <td class="other-columns"><span style="color: red;">X</span></td>
+                                                <td class="other-columns"><span style="color: red;">X</span></td>
+                                                <td class="other-columns">20%</td>
+                                                <td class="other-columns"><span id="expected-first-score"></span></td> -->
+                                            </tr>
+                                        </table>
+                                    </div>
                                 </div>
+                                <br>
+                                <br>
                                 <div class="row_table">
+                                    <div class="problem-area">
+                                        <p style="color: black;">2차 풀이</p>
+                                    </div>
+                                    
+                                    <div id="first-result-area">
+                                        <table id="first-result-table">
+                                            <tr>
+                                                <td class="result-legend">문제</td>
+                                                <td class="problem-columns">1</td>
+                                                <td class="problem-columns">2</td>
+                                                <td class="problem-columns">3</td>
+                                                <td class="problem-columns">4</td>
+                                                <td class="problem-columns">5</td>
+                                                <td class="problem-columns">정답률</td>
+                                                <td class="problem-columns">예측점수</td>
+                                            </tr>
+                                            <!-- 123/103/220 -->
+                                            <tr id="tr-value-02">
+                                                <!-- <td class="result-legend">맞춘 여부</td>
+                                                <td class="other-columns"><span style="color: red;">X</span></td>
+                                                <td class="other-columns"><span style="color: blue;">O</span></td>
+                                                <td class="other-columns"><span style="color: red;">X</span></td>
+                                                <td class="other-columns"><span style="color: blue;">O</span></td>
+                                                <td class="other-columns"><span style="color: red;">X</span></td>
+                                                <td class="other-columns">40%</td>
+                                                <td class="other-columns"><span id="expected-second-score"></span></td> -->
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                                <!-- <div class="row_table">
                                     <div class="col_table css_table_text">
                                         <div id="graph1">
                                                 
@@ -278,85 +595,94 @@
                                                 
                                         </div>
                                     </div>
-                                </div>
+                                </div> -->
                             </div>
                         </div>
-                    
                     </div>
-                    <script>
-                        const openModal = () =>{
-                            // Get the modal
-                            var modal = document.getElementById("myModal");
-
-                            // Get the button that opens the modal
-                            var btn = document.getElementById("modalBtn");
-
-                            // Get the <span> element that closes the modal
-                            var span = document.getElementsByClassName("close")[0];
-
-                            // When the user clicks the button, open the modal 
-                            btn.onclick = function() {
-                            modal.style.display = "block";
-                            }
-
-                            // When the user clicks on <span> (x), close the modal
-                            span.onclick = function() {
-                            modal.style.display = "none";
-                            }
-
-                            // When the user clicks anywhere outside of the modal, close it
-                            window.onclick = function(event) {
-                            if (event.target == modal) {
-                                modal.style.display = "none";
-                            }
-                            }    
-                        }
-                        openModal();
-                        const refresh = () =>{
-                            let btn = document.getElementById("refreshBtn")
-                            let cnt=1; // 변수 지정안하면 무한 새로고침 하게 됨
-                            if (cnt==1){
-                                btn.onclick = ()=>{document.location.reload()} 
-                            }
-                            cnt=0;
-                        }
-                        refresh();
-                    </script>
                 </div>
             </div>
-            
-
         </div>
+        <script>
+            const subjects ={
+                2065 : "한국사",
+                2085 : "수학",
+                7600 : "영어",
+                7621 : "생명과학",
+                2010 : "화학"
+            }
+            const openModal = () =>{
+                
+                // Get the modal
+                var modal = document.getElementById("myModal");
+
+                // Get the button that opens the modal
+                var btn = document.getElementById("modalBtn");
+
+                // Get the <span> element that closes the modal
+                var span = document.getElementsByClassName("close")[0];
+
+                // When the user clicks the button, open the modal 
+                btn.onclick = function() {
+                modal.style.display = "block";
+                }
+
+                // When the user clicks on <span> (x), close the modal
+                span.onclick = function() {
+                modal.style.display = "none";
+                }
+
+                // When the user clicks anywhere outside of the modal, close it
+                window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.style.display = "none";
+                }
+                }    
+            }
+            
+            const refresh = () =>{
+                let btn = document.getElementById("refreshBtn")
+                let cnt=1; // 변수 지정안하면 무한 새로고침 하게 됨
+                if (cnt==1){
+                    btn.onclick = ()=>{document.location.reload()} 
+                }
+                cnt=0;
+            }
+            const restart = ()=>{
+                let btn = document.getElementById("restartBtn")
+                console.log(btn)
+                btn.onclick = () =>{
+                    console.log('restartBtn');
+                    document.querySelector("#result").style.display = 'none';
+                    document.querySelector("#select").style.display = 'none';
+                    document.querySelector("#question-section").dataset.started = true;
+                    document.querySelector("#start-btn").style.display='none';
+                    document.querySelector("#divspace").style.display='none';
+                    document.querySelector("#inputname").style.display='none';
+                    document.querySelector("#inputplz").style.display='none';
+                    document.querySelector("#spinner").style.display = 'inline-block';
+                    document.querySelector("#footer").style.display = 'none';
+                    set_question(0);
+                    document.querySelector("#question-section").style.display = 'block';
+                }
+            }
+            openModal();
+            refresh();
+            restart();
+        </script>
         <script>
             var QUESTION_LIST = []
 
-    // assessmentItemID = db.Column(db.String(20),primary_key=True) # 문항 번호
-    // testId = db.Column(db.String(20)) # 문제지 번호
-    // KnowledgeTag = db.Column(db.String(20)) # 문제 유형
-    // real_answer = db.Column(db.Integer) # 실제 답
-    // img_url = db.Column(db.String(256)) # 이미지 저장 경로
-    // q_content = db.Column(db.String(256)) # 문제 설명
-            
-            {% for q in questions %}
-                QUESTION_LIST.push({
-                    assessmentItemID : "{{q.assessmentItemID}}",
-                    testId : "{{q.testId}}",
-                    KnowledgeTag : {{q.KnowledgeTag}},
-                    real_answer : {{q.real_answer}},
-                    img_url : "{{q.img_url}}",
-                    q_content : "{{q.q_content}}"
-                })
-            {% endfor %}
-
-            console.log(QUESTION_LIST)
+            // console.log(QUESTION_LIST)
             var answers = [];
             function getRandomIntInclusive(min, max) {
                 min = Math.ceil(min);
                 max = Math.floor(max);
                 return Math.floor(Math.random() * (max - min + 1)) + min; //최댓값도 포함, 최솟값도 포함
             }
+            // 문제 설정
             function set_question(index){
-                
+                console.log('set_question...')
+                console.log(QUESTION_LIST)
                 let q_content = QUESTION_LIST[index].q_content;
                 // $('#tag').text(q_content);
                 document.querySelector("#tag").innerHTML = q_content;
@@ -368,7 +694,7 @@
                 // var url = `https://source.unsplash.com/random/${width}x${height}`;
                 let url = QUESTION_LIST[index].img_url
                 
-                document.querySelector("#question-image").src = `static/problems/${url}`;
+                document.querySelector("#question-image").src = `static/problems${url}`;
                 
             }
 
@@ -382,7 +708,17 @@
                 
                 return false;
             }
-            
+            const cha = function(){
+                    console.log('이벤트감지');
+                let selected  = document.querySelector("#selected-tag").innerHTML
+                if(selected.length==0){
+                    document.querySelector("#select-btn").disabled = true
+                }else{
+                    document.querySelector("#select-btn").disabled = false
+                }
+                
+            }
+
             document.addEventListener('keyup',event=>{
                 if(event.target.closest('#inputname')){
                     let inputname_01 = document.querySelector('#inputname').value
@@ -397,7 +733,6 @@
                         start_btn.disabled = false
                 }
             })
-            
             function get_score(){
                 // print(QUESTION_LIST)
                 
@@ -423,36 +758,240 @@
                     }
                 }).then(res => res.json())
                 .then(response => {
+
+                    let second_result = response['second_result']
+                    response = response['score']
+
+                    document.querySelector("#tr-value-01").innerHTML=''
+                    document.querySelector("#tr-value-01").innerHTML+=`<td class="result-legend">맞춘 여부</td>`
+                    var cor=0
+                    for(let i=0;i<5;i++){
+                        let ans = QUESTION_LIST[i]['answer']
+                        if(ans==0){
+                            document.querySelector("#tr-value-01").innerHTML+=`<td class="other-columns"><span style="color: red;">X</span></td>`
+                        }else if(ans==1){
+                            cor++;
+                            document.querySelector("#tr-value-01").innerHTML+=`<td class="other-columns"><span style="color: blue;">O</span></td>`
+                        }
+                    }
+                    document.querySelector("#tr-value-01").innerHTML+=`<td class="other-columns">${(cor/5.0)*100}</td>`
+                    document.querySelector("#tr-value-01").innerHTML+=`<td class="other-columns"><span id="expected-first-score"></span></td>`
+
+
+                    document.querySelector("#tr-value-02").innerHTML=''
+                    document.querySelector("#tr-value-02").innerHTML+=`<td class="result-legend">맞춘 여부</td>`
+                    cor=0
+                    for(let i=5;i<QUESTION_LIST.length;i++){
+                        let ans = QUESTION_LIST[i]['answer']
+                        if(ans==0){
+                            document.querySelector("#tr-value-02").innerHTML+=`<td class="other-columns"><span style="color: red;">X</span></td>`
+                        }else if(ans==1){
+                            cor++;
+                            document.querySelector("#tr-value-02").innerHTML+=`<td class="other-columns"><span style="color: blue;">O</span></td>`
+                        }
+                    }
+                    document.querySelector("#tr-value-02").innerHTML+=`<td class="other-columns">${(cor/5.0)*100}</td>`
+                    document.querySelector("#tr-value-02").innerHTML+=`<td class="other-columns"><span id="expected-second-score"></span></td>`
+
+
                     var score = parseInt(JSON.stringify(response));
                     document.querySelector("#spinner").style.display = 'none';
                     document.querySelector("#question-section").style.display = 'none';
                     document.querySelector("#result").style.display = 'block';
+                    document.querySelector("#second-score").value = second_result;
+                    document.querySelector("#expected-first-score").innerHTML = document.querySelector("#first-score").value
+                    document.querySelector("#expected-second-score").innerHTML = document.querySelector("#second-score").value
+
                     let inputname = document.querySelector("#inputname").value
-                    document.querySelector("#display_prob").innerHTML = `${inputname}님이 수리영역 가형에서 다음 문제를 맞출 확률`;
+                    let selected_pokemon = document.querySelector("#input-selected-tag").value
+                    document.querySelector("#display_prob").innerHTML 
+                    // = `<span id="result01">${inputname}</span><span id="result02">님이 수고하셨습니다 ${selected_pokemon}과 궁합이 좋을 확률</span>`;
+                    = `<span id="result01">${inputname}</span><span id="result02">님, 수고하셨습니다</span>`;
+
                     if (score != 0){
                         animateValue("value", 0, JSON.stringify(response), 3000)
                     }
+
+                    fetch('/get_question',{
+                        method : 'GET'
+                    }).then(res=>res.json())
+                    .then(res=>{
+                        console.log('fetching...')
+                        console.log(res)
+                    }).error(err=>console.log(err))
+
                 })
                 .catch(error => console.error('Error:', error));
             }
+            const shuffle = a=>{
+                var j, x, i; 
+                for (i = a.length; i; i -= 1) { 
+                    j = Math.floor(Math.random() * i); 
+                    x = a[i - 1];
+                    a[i - 1] = a[j]; 
+                    a[j] = x; 
+                    }
+                return a;
+            }
+            // 중간 예측값
 
+            const get_mid_score=(end_idx)=>{
+                real_answer = []
+                console.log('질문 리스트 확인')
+                console.log(QUESTION_LIST)
+                for(let ra of QUESTION_LIST){
+                    real_answer.push(ra.real_answer)
+                }
+                // console.log('정답을 올바르게 찍었는 지 확인')
+                // console.log(answers)
+                // console.log(real_answer)
+                for (var i = 0; i < end_idx; i++) {
+                    // console.log('정답')
+                    // console.log(answers[i])
+                    // console.log(real_answer[i])
+                    // console.log(answers[i]==real_answer[i])
+                    if(answers[i]==real_answer[i]){
+                        // QUESTION_LIST[i]['answer'] = answers[i] = 1
+                        QUESTION_LIST[i]['answer'] = 1
+                    }
+                    else{
+                        // QUESTION_LIST[i]['answer'] = answers[i] = 0
+                        QUESTION_LIST[i]['answer'] = 0
+                    }
+                }
+
+                fetch('/get_score', {
+                    method: 'POST', // or 'PUT'
+                    body: JSON.stringify(QUESTION_LIST.slice(0,end_idx)), // data can be `string` or {object}!
+                    headers:{
+                        'Content-Type': 'application/json'
+                    }
+                }).then(res => res.json())
+                .then(res => {
+                    res = res['score']
+                    document.querySelector("#spinner").style.display = 'none';
+                   document.querySelector("#mid_score").innerHTML = res
+                   document.querySelector("#first-score").value = res 
+                   let score = parseInt(res)
+                   let selected_tag = document.querySelector("#input-selected-tag").value
+                   
+                   // 추천 과목 매기기
+                   console.log("태그 수")
+                   
+                   let shuffled_tags = shuffle(tags)
+                //    console.log('선택한 태그')
+                //    console.log(selected_tag)
+                //    console.log(shuffled_tags)
+                   shuffled_tags.splice(shuffled_tags.indexOf(parseInt(selected_tag.replaceAll("tag-",""))),1)
+                //    console.log(shuffled_tags)
+                   if(score>=40){
+                    
+                    // document.querySelector("#recommend").innerHTML = `계속 풀어도 문제가 없겠는데요??` 다른 유형도 풀어보세요~
+                    document.querySelector("#recommend").innerHTML = `다른 유형도 풀어보세요~`
+                    let tmp_tag = document.querySelector("#input-selected-tag").value.replaceAll("tag-","")
+                    document.querySelector("#mid_result").innerHTML +=`
+                        <button class="next_button" id="${selected_tag}-btn">${subjects[parseInt(tmp_tag)]}</button>
+                        <br>
+                        <p>다른 유형 선택</p>
+                        <div id="next_button_area">
+                        </div>
+                    `
+                    for(let i=0;i<4;i++){
+                        let t = shuffled_tags[i]
+                        
+                        document.querySelector("#next_button_area").innerHTML+=`
+                    <button class="next_button, button_ext" id="${t}-btn" onclick="next_button_tag(${t})" >${subjects[t]}</button>
+                    `
+                    }
+                   }else{
+                    // document.querySelector("#recommend").innerHTML = `다른 유형을 푸시는 게... 도움이 될 듯 합니다.`
+                    document.querySelector("#recommend").innerHTML = `다시한번 풀어보는게 어떨까요?`
+                    let tmp_tag = document.querySelector("#input-selected-tag").value.replaceAll("tag-","")
+                    document.querySelector("#mid_result").innerHTML +=`
+                        <button class="next_button" id="${selected_tag}-btn">${subjects[parseInt(tmp_tag)]}</button>
+                        <br>
+                        <p>다른 유형 선택</p>
+                        <div id="next_button_area">
+                        </div>
+                    `
+                    for(let i=0;i<4;i++){
+                        let t = shuffled_tags[i]
+                        
+                        document.querySelector("#next_button_area").innerHTML+=`
+                    <button class="next_button, button_ext" id="${t}-btn" onclick="next_button_tag(${t})" >${subjects[t]}</button>
+                    `
+                    }
+                   }
+                })
+            }
+
+            const tag_select = (id) =>{
+                            // console.log(id)
+                            let tag_name = `#tag-${id}`
+                                document.querySelector("#selected-tag").innerHTML = `${subjects[id]}`
+                                document.querySelector("#input-selected-tag").value = `${document.querySelector(tag_name).dataset.tag}`
+                                document.querySelector("#select-btn").disabled = false
+                        }
+
+            const mid_result = ()=>{
+                document.querySelector("#spinner").style.display = 'none';
+                document.querySelector("#question-section").style.display = 'none';
+                document.querySelector("#mid_result").style.display = 'block';
+            }
+
+            const next_button = () =>{
+                document.querySelector(".next_button").onclick =()=>{
+                            document.querySelector("#spinner").style.display = 'inline-block';
+                    setTimeout(()=>{
+                        document.querySelector("#mid_result").style.display = 'none';
+                            // document.querySelector("#question-section").dataset.started = true;
+                            document.querySelector("#question-section").style.display = 'inline-block';
+                            set_question(5);
+                            console.log(QUESTION_LIST)
+                        },2000);
+                }
+            }
+
+            const next_button_tag = (tag)=>{
+                fetch(`/get_question?tag=${tag}&start=5&end=10`,{
+                        method : 'GET'
+                    }).then(res=>res.json())
+                    .then(res=>{
+                        for(let i=5;i<QUESTION_LIST.length;i++){
+                            QUESTION_LIST[i] = res[i-5]
+                        }
+                        
+                    })
+                setTimeout(()=>{
+                    document.querySelector("#mid_result").style.display = 'none';
+                        // document.querySelector("#question-section").dataset.started = true;
+                        document.querySelector("#question-section").style.display = 'inline-block';
+                        set_question(5);
+                        console.log(QUESTION_LIST)
+                    },2000);
+            }
             
-
             var isClicked = false;
+            var tags;
+            
         // 데이터 세트는 HTML 표준에 정의된 기능
         // DOM요소에 값을 저장, JS 코드로 값을 읽어들일 수 있음
             document.addEventListener('click', function (event) {
+                let pokemon = document.querySelectorAll(".pokemon")
                 if (!event.target.closest('.btn')) return;
+                
                 if (event.target.closest('.answer-btn')){
                     if (isClicked) return;
                     isClicked=true;
                     
                     event.target.dataset.clicked = true;
                     var answer = event.target.dataset.answer;
+                    // console.log(answer)
                     var index = parseInt(document.querySelector("#q-number").innerHTML);
+                    let select = document.querySelector("#select").dataset.select;
                         
                     answers.push(answer)
-                    if (index==5){
+                    if (index==10){
                         setTimeout(function(){
                             get_score();
                             bar_graph(1);
@@ -460,25 +999,93 @@
                             bar_graph(3);
                             bar_graph(4);
                         },1000);
-                    }else{
+                    }else if(index==5){
+                        mid_result();
+                        get_mid_score(index);
+                        setTimeout(()=>{
+                            next_button();
+                        },2000)
+                    }
+                    else{
                         setTimeout(function(){
                             set_question(index);
                         },500);
                     }
+
                     document.querySelector("#spinner").style.display = 'inline-block';
                     document.querySelector("#question-section").style.opacity = 0;
                 }else if (event.target.closest('#start-btn')){
-                    document.querySelector("#question-section").dataset.started = true;
+                    console.log("start-btn clicked")
+
+                    //오디오 켜기
+                    // let audio = new Audio('static/포켓몬 1기.mp3')
+                    // audio.play();
+                    // audio.volume = 0.1;
+                    // audio.loop = true;
+                    fetch('/get_tags',{
+                        method : 'GET'
+                    }).then(res=>res.json())
+                    .then(res=>{
+                        console.log('fetching tags...')
+                        console.log(res)
+                    document.querySelector("#question-section").dataset.started = false;
                     document.querySelector("#start-btn").style.display='none';
                     document.querySelector("#divspace").style.display='none';
                     document.querySelector("#inputname").style.display='none';
                     document.querySelector("#inputplz").style.display='none';
-                    document.querySelector("#spinner").style.display = 'inline-block';
+                    // document.querySelector("#spinner").style.display = 'inline-block';
+                    document.querySelector("#select").style.display = 'inline-block'
                     document.querySelector("#footer").style.display = 'none';
-                    set_question(0);
+                    
+                     tags = res.data;
+                    document.querySelector("#tags-hidden").value = tags
+                    
+                    console.log('작동 되나');
+                    for(let i of tags){
+                        document.querySelector("#myUL")
+                        .innerHTML+=`<li><a href="#" id="tag-${i}" onclick="tag_select(${i});" class="pokemon" data-tag="tag-${i}">${subjects[i]}</a></li>`;
+                        // tag_select(i)
+                    }
+
+                    })
+                    
+                    
+                    // set_question(0)
+                }else if (event.target.closest('#select-btn')){
+                    let tag = document.querySelector("#input-selected-tag").value.replaceAll("tag-","")
+                    fetch(`/get_question?tag=${tag}&start=0&end=10`,{
+                        method : 'GET'
+                    }).then(res=>res.json())
+                    .then(res=>{
+                        QUESTION_LIST = res
+                    })
+
+                    document.querySelector("#start-btn").style.display='none';
+                            document.querySelector("#divspace").style.display='none';
+                            document.querySelector("#inputname").style.display='none';
+                            document.querySelector("#inputplz").style.display='none';
+                            document.querySelector("#footer").style.display = 'none';
+                            document.querySelector("#select").dataset.select = 'true';
+                            document.querySelector("#select").style.display = 'none';
+                            document.querySelector("#spinner").style.display = 'inline-block';
+                    setTimeout(()=>{
+                            document.querySelector("#question-section").dataset.started = true;
+                            set_question(0);
+                            console.log(QUESTION_LIST)
+                        },2000);
+                    
                 }
             });
             
+            document.querySelector("#select").onload = () =>{
+                if (document.querySelector("#select").dataset.started !=='false'){
+                    document.querySelector("#spinner").style.display = 'none';
+                    // document.querySelector("#question-section").style.opacity = 1;
+                    document.querySelector("#select").style.display = 'inline-block'
+                    isClicked=false;
+                    }
+                }
+
             document.querySelector("#question-image").onload = function() {
                 if (document.querySelector("#question-section").dataset.started !=='false'){
                     document.querySelector("#spinner").style.display = 'none';

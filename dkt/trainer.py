@@ -28,6 +28,8 @@ import wandb
 
 import torch.cuda.amp
 
+import mlflow
+
 def run(args, train_data, valid_data):
     lgbm_params=args.lgbm.model_params
     
@@ -77,6 +79,10 @@ def run(args, train_data, valid_data):
         if args.wandb.using:
             wandb.log({"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc":train_acc,
                   "valid_auc":auc, "valid_acc":acc})
+        if args.mlflow.using:
+            mlflow.log_metric('train_loss', train_loss, step=args.n_epochs)
+            
+
         if auc > best_auc:
             best_auc = auc
             # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
@@ -88,6 +94,8 @@ def run(args, train_data, valid_data):
 
                 args.model_dir, f'{args.task_name}.pt',
             )
+            if args.mlflow.using:
+                mlflow.pytorch.log_model(model, "save_model")
             early_stopping_counter = 0
         else:
             early_stopping_counter += 1
@@ -100,6 +108,10 @@ def run(args, train_data, valid_data):
             scheduler.step(best_auc)
         else:
             scheduler.step()
+
+        if args.mlflow.using:
+            #mlflow 기록 종료
+            mlflow.end_run()
 
 def run_kfold(args, train_data, train_uid_df):
     n_splits = args.n_fold
@@ -168,6 +180,9 @@ def run_kfold(args, train_data, train_uid_df):
                     },
                     (args.model_dir + args.task_name), f'{args.task_name}_{fold+1}fold.pt',
                 )
+                if args.mlflow.using:
+                    print("mlflow is saving model...")
+                    mlflow.pytorch.log_model(model, "save_model")
                 early_stopping_counter = 0
             else:
                 early_stopping_counter += 1
@@ -197,6 +212,10 @@ def run_kfold(args, train_data, train_uid_df):
     oof_df.to_csv(write_path, index=False)
 
     print(f'Valid AUC : {val_auc}, Valid ACC : {val_acc} \n')
+
+    if args.mlflow.using:
+            #mlflow 기록 종료
+            mlflow.end_run()
 
 
 def train(train_loader, model, optimizer, args):
@@ -779,6 +798,7 @@ def save_checkpoint(state, model_dir, model_filename):
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)    
     torch.save(state, os.path.join(model_dir, model_filename))
+    
 
 def load_model_kfold(args, fold):
     model_path = os.path.join((args.model_dir + args.task_name), f'{args.task_name}_{fold+1}fold.pt')

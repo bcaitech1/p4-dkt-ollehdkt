@@ -2,14 +2,25 @@ import inference_for_serving as inference
 import pandas as pd
 from server import *
 
+import random
+
+import os
+import sqlite3
+
 ## 테스트 코드 작성하는 곳
+
+input_dir = f'/opt/ml/input/data/train_dataset'
+db_dir = f'/opt/ml/code-final/p4-dkt-ollehdkt'
 
 def main(args):
     # user_data = pd.read_csv('/opt/ml/p4-dkt-ollehdkt/questions.csv')
     # score = inference.inference(user_data,args)
     # score = int(score)
 
-    test_add_questions()
+    # test_add_questions()
+    test_list()
+    # test_select_tag()
+    # get_tags_test()
 
 if __name__ == "__main__":
     main(args)
@@ -56,5 +67,31 @@ def test_add_questions():
         )
     print('Done...')
 
-def test01():
+# csv로 sqlite에 저장하는 테스트
+def test_list():
+    csv_file = os.path.join(input_dir,'test_list.xlsx')
+    df = pd.read_excel(csv_file)
+    df.set_index('assessmentItemID',inplace = True)
+    # df['img_url'] = 'no-image.jpg'
+    df['img_url'] = df['img_url'].apply(lambda x:f'{x[:-4]}.png')
+    print(type(df['img_url']))
+    # df['q_content'] = [f'문제 : {i}' for i in range(len(df))]
+    print(df)
+    print(df.columns)
+    df['real_answer']=1
+    df['real_answer'] = df['real_answer'].apply(lambda x: random.randint(1,5))
+
+    con = sqlite3.connect(os.path.join(db_dir,'db.sqlite'))
+    df.to_sql('test',con)
+
+    pass
+
+# 2065, 2085, 7600, 7621, 2010
+def test_select_tag():
+    get_question_by_tag(2065)
+    pass
+
+def get_tags_test():
+    res = get_tags()
+    print(res)
     pass

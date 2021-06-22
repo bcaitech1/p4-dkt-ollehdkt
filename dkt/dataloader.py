@@ -37,14 +37,24 @@ class Preprocess:
         return self.test_data
 
 
-    def split_data(self, data):
+    def split_data(self, data, ratio=0.7, shuffle=True, seed=42):
         """
         split data into two parts with a given ratio.
         """
+        #lgbm일 경우
+        if self.args.model=='lgbm':
+            return lgbm_split_data(data,ratio,seed)
 
-        
+        #lgbm이 아닐 경우
+        if shuffle:
+            random.seed(seed) # fix to default seed 0
+            random.shuffle(data)
 
-        return train, valid
+        size = int(len(data) * ratio)
+        data_1 = data[:size]
+        data_2 = data[size:]
+
+        return data_1, data_2
 
     def __save_labels(self, encoder, name):
         le_path = os.path.join(self.args.asset_dir, name + '_classes.npy') # 해당 클래스는 numpy로 저장
@@ -165,8 +175,8 @@ class Preprocess:
                 
             r = pd.DataFrame()
             # df['Timestamp'] = pd.to_datetime(df['Timestamp'].values)
-            df = fe.make_feature(self.args,df)
-            df.drop(['solve_time'],axis=1, inplace=True)
+            # df = fe.make_feature(self.args,df)
+            # df.drop(['solve_time'],axis=1, inplace=True)
             df = fe.feature_engineering_15(df)
             # print(min(df['rank_point']))
             # print(max(df['rank_point']))
@@ -227,14 +237,11 @@ class Preprocess:
 #         self.args.cont_cols = ['solve_time', 'test_t_mean',
 #        'test_t_std', 'test_t_skew', 'assess_t_mean', 'assess_t_std',
 #        'assess_t_skew', 'tag_t_mean', 'tag_t_std', 'tag_t_skew']
-        self.args.cate_cols = ['assessmentItemID','testId','KnowledgeTag',"test_level","problem_number"]
+        self.args.cate_cols = ['assessmentItemID','testId','KnowledgeTag',"test_level"]
         self.args.cont_cols = ['solve_time', 'mean_elapsed', 'test_time', 'grade_time', # 시간
             'answer_acc','tag_acc', 'test_acc', 'assess_acc', # 정답률
-            'level_tag_acc', 'level_test_acc', 'level_assess_acc', # 대분류&정답률
-            'tag_cumAnswer',"wrongP_time","correctP_time","test_mean","test_sum","ItemID_mean","tag_mean","tag_sum","test_t_mean"
-        ,"test_t_std","test_t_skew","assess_t_mean","assess_t_std","assess_t_skew","tag_t_mean","tag_t_std","tag_t_skew"
-        ,"test_tag_cumsum","user_total_correct_cnt","user_total_ans_cnt","user_total_acc","userID-solve_time-mean","userID-solve_time-std"
-        ,"userID-solve_time-skew"]
+            'level_tag_acc', 'level_test_acc', 'level_assess_acc', # 수준 및 정답률
+            ]
         # self.args.cont_cols.extend(dohoon_feats)
          # 실험할 연속형 (user_acc)'solve_time', 'user_acc','user_correct_answer', 'user_total_answer',
         df = self.__preprocessing_v2(df, is_train)

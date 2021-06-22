@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Float
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
@@ -52,3 +52,54 @@ class Question(db.Model):
         self.img_url = f'{img_url}'
         self.q_content = q_content if q_content is not None else ''
         # blob 방식으로 해도 되지만, sqlite는 경량 db이므로 url만 저장하고 이미지는 /static/problems 에 있다.
+
+
+class Test(db.Model):
+    __tablename__ = 'test'
+
+    assessmentItemID = db.Column(db.String(20),primary_key=True) # 문항 번호
+    testId = db.Column(db.String(20)) # 문제지 번호
+    KnowledgeTag = db.Column(db.String(20)) # 문제 유형
+    Timestamp = db.Column(db.DateTime)
+    grade = db.Column(db.Integer)
+    test_rate = db.Column(db.Float) 
+    que_rate = db.Column(db.Float)
+    tag_rate  = db.Column(db.Float)
+    answerCode = db.Column(db.Integer)
+    img_url = db.Column(db.Integer)
+    q_content = db.Column(db.Integer)
+    real_answer = db.Column(db.Integer)
+
+    # 'Timestamp', 'KnowledgeTag', 'test_rate', 'que_rate',
+    #    'tag_rate', 'answerCode'
+
+    def __init__(self,assessmentItemID,testId=None,KnowledgeTag=None, Timestamp=None, grade = None, test_rate=None, que_rate=None, tag_rate=None, answerCode=None,
+                img_url=None, q_content=None, real_answer=None):
+        self.assessmentItemID = assessmentItemID
+        self.testId = testId
+        self.KnowledgeTag = KnowledgeTag
+        self.Timestamp = Timestamp
+        self.grade = grade
+        self.test_rate = test_rate 
+        self.que_rate = que_rate
+        self.tag_rate  = tag_rate
+        self.answerCode = answerCode
+        self.img_url = img_url
+        self.q_content = q_content
+        self.real_answer = real_answer
+
+    def to_dict(self):
+        return {
+           "assessmentItemID" : self.assessmentItemID, 
+            "testId" : self.testId,
+            "KnowledgeTag" : self.KnowledgeTag,
+            "Timestamp" :        self.Timestamp, 
+            "grade" :        self.grade,
+            "test_rate" :       self.test_rate,
+            "que_rate" :        self.que_rate,
+            "tag_rate" :        self.tag_rate,
+            "answerCode" : self.answerCode,
+            "img_url" :        self.img_url,
+            "q_content" : self.q_content,
+            "real_answer" : self.real_answer
+        }
