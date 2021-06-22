@@ -266,6 +266,21 @@ for i in range(len(pd_list[0])):
 <br>
 
 ---
+### 7. 서빙(feat. Web) <a name = 'serving'></a>
+
+위에서 생성한 모델을 활용하여 간단한 SPA 웹 앱인 "Mini 수능" 만듦
+
+추가 기술 : Flask, HTML, CSS, Javascript
+
+7.1 웹 서빙 구조도
+
+7.2 시연 gif
+![image8](https://github.com/bcaitech1/p4-dkt-ollehdkt/blob/final_sangi/%EC%8B%9C%EC%97%B0%EC%98%81%EC%83%81.gif?raw=true)
+
+---
+<br>
+
+---
 
 ### Reference
 
