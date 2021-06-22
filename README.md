@@ -276,7 +276,7 @@ for i in range(len(pd_list[0])):
 
 ![image8](https://user-images.githubusercontent.com/9896149/122941495-665ce180-d3b0-11eb-905c-a885c4ad8170.png)
 
-7.2 시연 gif
+7.2 시연
 
 ![image8](https://github.com/bcaitech1/p4-dkt-ollehdkt/blob/final_sangi/%EC%8B%9C%EC%97%B0%EC%98%81%EC%83%81.gif?raw=true)
 
