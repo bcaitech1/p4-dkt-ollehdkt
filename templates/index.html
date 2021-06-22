@@ -364,11 +364,6 @@
             <div class="row" style="padding:20px;">
                 <h1 id="title">Mini 수능</h1>
             </div>
-            <!-- <p style="font-size:20px;">
-                자, 이제 시작이야~, 내 꿈을~🎶 <br>
-                내 꿈을 위한 여행, 피카츄 <br>
-                - 포켓몬스터 무인편 OST(1999) 중에서 -
-            </p> -->
             <div>
                 <p id="inputplz">당신의 <span style="color : skyblue;">이름</span>을 입력하세요</p><br>
                 <input type="text" id="inputname" placeholder="2~20자로 입력, 영어만 or 한글만"/>
@@ -392,22 +387,11 @@
             <input type="hidden" id="tags-hidden">
             <input type="hidden" id="first-score">
             <input type="hidden" id="second-score">
-            <!-- <div id ="exdiv">
-                <div id="div1">
-                </div>
-                <div id="div2">
-                </div>
-                <div id="div3">
-                </div>
-            </div> -->
             <div id="select" style="display:none;" data-select="false">
                     
                     <div id="searchFilter-area">
-                        <!-- <div id="inner-select">
-
                         </div> -->
                         <input type="text" id="myInput" onkeyup="searchFilter()" placeholder="문제 유형 검색" title="Type in a name">
-                        <!-- <ul id="myUL" style="display: none;"> -->
                             <ul id="myUL" >
                             </ul>
                     <script>
@@ -479,20 +463,13 @@
                 <div id="mid_result" style="display: none;">
                     <p id="recommend">유형을 바꾸시겠습니까?</p><br>
                     <p>현재 예측 수준도 : <span id="mid_score"></span></p>
-                    <!-- <button id="next_button">Next</button>
-                    <br>
-                    <p>다른 유형 선택</p>
-                    <div id="next_button_area">
-                    </div> -->
                 </div>
                 <div id="result" style="display:none;">
-                    <!-- <div id="result"> -->
                     <h3 id="display_prob">당신이 더 잘할 확률</h3>
                     <span id="value">0</span> / 100
                     <p>Refresh를 눌러 다시 도전하세요!</p>
                     <button id="modalBtn">결과 확인</button>
                     <button id="refreshBtn">Refresh</button>
-                    <!-- <button id="restartBtn" disabled>성적표</button> -->
                     <!-- The Modal -->
                     <div id="myModal" class="modal">
                         <!-- Modal content -->
@@ -503,8 +480,6 @@
                             
                             <div id="table">
                                 <div class="row_table">
-                                    <!-- <div class="col_table css_table_text">Graph1</div>
-                                    <div class="col_table css_table_text">Graph2</div> -->
                                     <div class="problem-area">
                                         <p style="color: black;">1차 풀이</p>
                                     </div>
@@ -521,16 +496,7 @@
                                                 <td class="problem-columns">정답률</td>
                                                 <td class="problem-columns">예측점수</td>
                                             </tr>
-                                            <!-- 123/103/220 -->
                                             <tr id="tr-value-01">
-                                                <!-- <td class="result-legend">맞춘 여부</td>
-                                                <td class="other-columns"><span style="color: red;">X</span></td>
-                                                <td class="other-columns"><span style="color: blue;">O</span></td>
-                                                <td class="other-columns"><span style="color: red;">X</span></td>
-                                                <td class="other-columns"><span style="color: red;">X</span></td>
-                                                <td class="other-columns"><span style="color: red;">X</span></td>
-                                                <td class="other-columns">20%</td>
-                                                <td class="other-columns"><span id="expected-first-score"></span></td> -->
                                             </tr>
                                         </table>
                                     </div>
@@ -554,48 +520,11 @@
                                                 <td class="problem-columns">정답률</td>
                                                 <td class="problem-columns">예측점수</td>
                                             </tr>
-                                            <!-- 123/103/220 -->
                                             <tr id="tr-value-02">
-                                                <!-- <td class="result-legend">맞춘 여부</td>
-                                                <td class="other-columns"><span style="color: red;">X</span></td>
-                                                <td class="other-columns"><span style="color: blue;">O</span></td>
-                                                <td class="other-columns"><span style="color: red;">X</span></td>
-                                                <td class="other-columns"><span style="color: blue;">O</span></td>
-                                                <td class="other-columns"><span style="color: red;">X</span></td>
-                                                <td class="other-columns">40%</td>
-                                                <td class="other-columns"><span id="expected-second-score"></span></td> -->
                                             </tr>
                                         </table>
                                     </div>
                                 </div>
-                                <!-- <div class="row_table">
-                                    <div class="col_table css_table_text">
-                                        <div id="graph1">
-                                                
-                                        </div>
-                                    </div>
-                                    <div class="col_table css_table_text">
-                                        <div id="graph2">
-                                                
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row_table">
-                                    <div class="col_table css_table_text">Graph3</div>
-                                    <div class="col_table css_table_text">Graph4</div>
-                                </div>
-                                <div class="row_table">
-                                    <div class="col_table css_table_text">
-                                        <div id="graph3">
-                                                
-                                        </div>
-                                    </div>
-                                    <div class="col_table css_table_text">
-                                        <div id="graph4">
-                                                
-                                        </div>
-                                    </div>
-                                </div> -->
                             </div>
                         </div>
                     </div>
@@ -603,6 +532,7 @@
             </div>
         </div>
         <script>
+            // 유형을 매핑시킨 객체
             const subjects ={
                 2065 : "한국사",
                 2085 : "수학",
@@ -842,20 +772,15 @@
                 for(let ra of QUESTION_LIST){
                     real_answer.push(ra.real_answer)
                 }
-                // console.log('정답을 올바르게 찍었는 지 확인')
-                // console.log(answers)
-                // console.log(real_answer)
+                
                 for (var i = 0; i < end_idx; i++) {
-                    // console.log('정답')
-                    // console.log(answers[i])
-                    // console.log(real_answer[i])
-                    // console.log(answers[i]==real_answer[i])
+                    
                     if(answers[i]==real_answer[i]){
-                        // QUESTION_LIST[i]['answer'] = answers[i] = 1
+                       
                         QUESTION_LIST[i]['answer'] = 1
                     }
                     else{
-                        // QUESTION_LIST[i]['answer'] = answers[i] = 0
+                        
                         QUESTION_LIST[i]['answer'] = 0
                     }
                 }
@@ -876,14 +801,11 @@
                    let selected_tag = document.querySelector("#input-selected-tag").value
                    
                    // 추천 과목 매기기
-                   console.log("태그 수")
                    
                    let shuffled_tags = shuffle(tags)
-                //    console.log('선택한 태그')
-                //    console.log(selected_tag)
-                //    console.log(shuffled_tags)
+                
                    shuffled_tags.splice(shuffled_tags.indexOf(parseInt(selected_tag.replaceAll("tag-",""))),1)
-                //    console.log(shuffled_tags)
+                
                    if(score>=40){
                     
                     // document.querySelector("#recommend").innerHTML = `계속 풀어도 문제가 없겠는데요??` 다른 유형도 풀어보세요~
@@ -926,7 +848,6 @@
             }
 
             const tag_select = (id) =>{
-                            // console.log(id)
                             let tag_name = `#tag-${id}`
                                 document.querySelector("#selected-tag").innerHTML = `${subjects[id]}`
                                 document.querySelector("#input-selected-tag").value = `${document.querySelector(tag_name).dataset.tag}`
@@ -1044,13 +965,12 @@
                     for(let i of tags){
                         document.querySelector("#myUL")
                         .innerHTML+=`<li><a href="#" id="tag-${i}" onclick="tag_select(${i});" class="pokemon" data-tag="tag-${i}">${subjects[i]}</a></li>`;
-                        // tag_select(i)
                     }
 
                     })
                     
                     
-                    // set_question(0)
+                
                 }else if (event.target.closest('#select-btn')){
                     let tag = document.querySelector("#input-selected-tag").value.replaceAll("tag-","")
                     fetch(`/get_question?tag=${tag}&start=0&end=10`,{
@@ -1080,7 +1000,7 @@
             document.querySelector("#select").onload = () =>{
                 if (document.querySelector("#select").dataset.started !=='false'){
                     document.querySelector("#spinner").style.display = 'none';
-                    // document.querySelector("#question-section").style.opacity = 1;
+                    
                     document.querySelector("#select").style.display = 'inline-block'
                     isClicked=false;
                     }
