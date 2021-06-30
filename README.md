@@ -268,7 +268,7 @@ for i in range(len(pd_list[0])):
 ---
 ### 7. 웹 서빙 <a name = 'serving'></a>
 
-위에서 생성한 모델을 활용하여 간단한 SPA 웹 앱인 "Mini 수능" 만듦
+위에서 생성한 모델을 활용하여 간단한 SPA 웹 앱인 "Mini 수능" 제작
 
 추가 사용 기술 : Flask, HTML, CSS, Javascript
 
