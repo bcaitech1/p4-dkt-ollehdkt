@@ -1,4 +1,4 @@
-# pstage_04_dkt
+# pstage_04_dkt(Deep Knowledge Tracing)
 ## config 파일을 통한 실행법
 ### 1. config.yml setting
 모델 선택, 하이퍼 파라미터 선택, 기타 테크닉 옵션 선택
