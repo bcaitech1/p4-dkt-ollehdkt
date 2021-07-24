@@ -1,6 +1,7 @@
 # pstage_04_dkt(Deep Knowledge Tracing)
 - 기간 : 2021.05.24~2021.06.15
 - 대회 내용 : 학생의 지식 상태를 추적하여 문제 리스트 중 마지막 문제 정답 여부 예측(AUC : 0.8362 최종 7등/15팀 중) 
+![task img](https://user-images.githubusercontent.com/52443401/126865028-66d9f100-e1c3-4633-8790-86c1f7d84f47.JPG)
 - 수행 요약 : 
 config.yml파일을 통한 실험으로 편리함 증진
 lgbm을 기존 NN모델 파이프라인에 통합
@@ -10,9 +11,11 @@ user_split k-fold 구현
 모든 모델 실험  
 
 ### Important Technic
-
+- k-fold (with user split)
+- 
 ### Important Feature
 - user's last order time
+![fi 사진](https://user-images.githubusercontent.com/52443401/126864608-e6af562b-e2b0-4ad7-9c2f-7a86bbac5b98.png)
 
 
 ## config 파일을 통한 실행법
