@@ -9,6 +9,10 @@
 - solve_time관련 feature들 생성
 - user_split k-fold 구현
 - 모든 모델 실험  
+### Main idea
+- 유저는 과목별로 상이한 풀이능력 및 이해도를 갖고 있다. (시험지별 정답률의 분산이 크다)
+- 초등학생/중학생의 특성상 오래 전의 풀이이력이 현재의 지식상태에 큰 영향을 주지 못한다.(금방 까먹는다)
+- 최근에 풀이했던 이력을 중심으로 유저를 정의하기
 
 ### Important Feature
 - solve_time / correct_time, wrong_time
