@@ -3,7 +3,7 @@
 - 대회 내용 : 학생의 지식 상태를 추적하여 문제 리스트 중 마지막 문제 정답 여부 예측(AUC : 0.8362 최종 7등/15팀 중) 
 ![task img](https://user-images.githubusercontent.com/52443401/126865028-66d9f100-e1c3-4633-8790-86c1f7d84f47.JPG)
 - 수행 요약 : 학생이 과목별, 시험지별 수행능력이 다름을 인지하고 한 학생을 여러 학생으로 split 하여 통계량 추출, short-term에 집중하였음
-
+- 사용 모델 : LGBM, LSTM, LSTM with attention, Bert, Saint, LastQuery
 ### Important Technic
 - k-fold (with user split)
 - config.yml파일을 통한 실험으로 편리함 증진
