@@ -9,6 +9,7 @@
 - config.yml파일을 통한 실험으로 편리함 증진
 - NN모델에 범주/연속형 피처를 자유롭게 넣을 수 있게 수정
 - solve_time관련 feature들 생성
+- user_month_split
 
 ### Important Feature
 - user's last order time
