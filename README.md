@@ -53,7 +53,7 @@ Team Rank : 7 , AUROC : 0.8362, Accuracy : 0.7527
 
 #### 지정재 [Project Branch](https://github.com/bcaitech1/p4-dkt-ollehdkt/tree/comb_main) ![Github Badge](https://img.shields.io/badge/-Github-161c22?style=flat&logo=github&link=https://github.com/PrimeOfMIne)![Blog Badge](http://img.shields.io/badge/Blog-51a9fe?style=flat&link=https://www.notion.so/bf6a15f41ccf4d5b9e5d056915cf2793) 
 
-#### 홍채원 [Project Branch](https://github.com/bcaitech1/p4-dkt-ollehdkt/tree/headbreakz) ![Github Badge](https://img.shields.io/badge/-Github-161c22?style=flat&logo=github&link=https://github.com/hcw3737)![Blog Badge](http://img.shields.io/badge/Blog-51a9fe?style=flat&link=https://www.notion.so/P_stage-4-6cfb7db7ddc8400b9e58a7eb1f70d13f)
+#### 홍채원 [Project Branch](https://github.com/bcaitech1/p4-dkt-ollehdkt/tree/chaewon) ![Github Badge](https://img.shields.io/badge/-Github-161c22?style=flat&logo=github&link=https://github.com/hcw3737)![Blog Badge](http://img.shields.io/badge/Blog-51a9fe?style=flat&link=https://www.notion.so/P_stage-4-6cfb7db7ddc8400b9e58a7eb1f70d13f)
 
 #### 스후페엘레나
 
