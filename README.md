@@ -49,7 +49,7 @@ Team Rank : 7 , AUROC : 0.8362, Accuracy : 0.7527
 
 #### 박상기 [Project Branch](https://github.com/bcaitech1/p4-dkt-ollehdkt/tree/final_sangi) [![Github Badge](https://img.shields.io/badge/-Github-161c22?style=flat&logo=github&link=https://github.com/philgineer/)](https://github.com/sangki930) [![Blog Badge](http://img.shields.io/badge/Blog-51a9fe?style=flat&link=https://philgineer.com/)](https://sangki930.tistory.com/)
 
-#### 임도훈 [Project Branch](https://github.com/bcaitech1/p4-dkt-ollehdkt/tree/final_dh)  [![Github Badge](https://img.shields.io/badge/-Github-161c22?style=flat&logo=github&link=https://github.com/philgineer/)](https://blog.naver.com/vail131) [![Blog Badge](http://img.shields.io/badge/Blog-51a9fe?style=flat&link=https://philgineer.com/)]
+#### 임도훈 [Project Branch](https://github.com/bcaitech1/p4-dkt-ollehdkt/tree/final_dh)  [![Github Badge](https://img.shields.io/badge/-Github-161c22?style=flat&logo=github&link=https://github.com/philgineer/)](https://github.com/vail131) [![Blog Badge](http://img.shields.io/badge/Blog-51a9fe?style=flat&link=https://philgineer.com/)](https://blog.naver.com/vail131)
 
 #### 지정재 [Project Branch](https://github.com/bcaitech1/p4-dkt-ollehdkt/tree/comb_main) [![Github Badge](https://img.shields.io/badge/-Github-161c22?style=flat&logo=github&link=https://github.com/philgineer/)](https://github.com/PrimeOfMIne) [![Blog Badge](http://img.shields.io/badge/Blog-51a9fe?style=flat&link=https://philgineer.com/)](https://www.notion.so/bf6a15f41ccf4d5b9e5d056915cf2793)
 
